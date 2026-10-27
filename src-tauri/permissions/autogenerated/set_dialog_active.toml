@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-set-dialog-active"
+description = "Enables the set_dialog_active command without any pre-configured scope."
+commands.allow = ["set_dialog_active"]
+
+[[permission]]
+identifier = "deny-set-dialog-active"
+description = "Denies the set_dialog_active command without any pre-configured scope."
+commands.deny = ["set_dialog_active"]

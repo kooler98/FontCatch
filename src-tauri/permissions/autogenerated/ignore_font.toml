@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-ignore-font"
+description = "Enables the ignore_font command without any pre-configured scope."
+commands.allow = ["ignore_font"]
+
+[[permission]]
+identifier = "deny-ignore-font"
+description = "Denies the ignore_font command without any pre-configured scope."
+commands.deny = ["ignore_font"]

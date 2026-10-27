@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-uninstall-family"
+description = "Enables the uninstall_family command without any pre-configured scope."
+commands.allow = ["uninstall_family"]
+
+[[permission]]
+identifier = "deny-uninstall-family"
+description = "Denies the uninstall_family command without any pre-configured scope."
+commands.deny = ["uninstall_family"]

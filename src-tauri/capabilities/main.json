@@ -1,0 +1,31 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "main",
+  "description": "Local Fontcatch panel only; no remote web origins.",
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "autostart:allow-is-enabled",
+    "autostart:allow-enable",
+    "autostart:allow-disable",
+    "dialog:allow-open",
+    "notification:allow-is-permission-granted",
+    "notification:allow-request-permission",
+    "core:event:allow-listen",
+    "core:event:allow-unlisten",
+    "allow-get-settings",
+    "allow-save-settings",
+    "allow-get-snapshot",
+    "allow-install-font",
+    "allow-ignore-font",
+    "allow-read-font-preview",
+    "allow-reveal-font",
+    "allow-open-font-license",
+    "allow-plan-uninstall",
+    "allow-uninstall-family",
+    "allow-open-link",
+    "allow-hide-panel",
+    "allow-set-dialog-active"
+  ]
+}
