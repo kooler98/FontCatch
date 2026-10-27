@@ -62,6 +62,13 @@
       "webviewInstallMode": {
         "type": "downloadBootstrapper"
       }
+    },
+    "license": "MIT",
+    "licenseFile": "../LICENSE",
+    "resources": {
+      "../LICENSE": "licenses/Fontcatch.txt",
+      "../THIRD_PARTY_NOTICES.md": "licenses/Third-party-notices.md",
+      "../src/components/beautiful-ui/LICENSE": "licenses/Beautiful-UI.txt"
     }
   }
 }
