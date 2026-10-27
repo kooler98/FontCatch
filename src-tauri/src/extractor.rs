@@ -571,10 +571,23 @@ mod tests {
         let deep = format!("{}font.ttf", "dir/".repeat(20));
         let a = archive(r.path(), &[(deep.as_str(), b"font")]);
         assert!(extract(&a, r.path()).is_err());
-        let a = archive(r.path(), &[("nested/CON.ttf", b"font")]);
+        let a = archive(r.path(), &[("nested/example.ttf", b"font")]);
         let e = extract(&a, r.path()).unwrap();
         assert_eq!(e.files[0].file_name().unwrap(), "font-0.ttf");
         assert_eq!(e.files[0].parent().unwrap(), e.dir.path());
+    }
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn windows_reserved_archive_names_are_rejected() {
+        for name in ["nested/CON.ttf", "nested/NUL.otf", "nested/COM1.ttc"] {
+            let r = tempfile::tempdir().unwrap();
+            let a = archive(r.path(), &[(name, b"font")]);
+            assert_eq!(
+                extract(&a, r.path()).err().as_deref(),
+                Some("unsafe_archive_path"),
+                "{name}"
+            );
+        }
     }
     #[test]
     fn case_collisions_are_rejected() {
