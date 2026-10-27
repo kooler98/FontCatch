@@ -1,6 +1,10 @@
 # Security
 
-Fontcatch is an early alpha. The current validation target is macOS Apple Silicon. Windows and Linux support is experimental; do not treat compilation or source availability as proof that those platforms are ready for distribution.
+Fontcatch is an early alpha. macOS Apple Silicon has been tested locally. Version 0.3.5 adds a Windows x64 preview with [passing automated Windows checks](https://github.com/kooler98/FontCatch/actions/runs/40540707057/job/122318362840). Linux remains experimental and is not ready for distribution.
+
+Windows CI passed Rust tests, native font registration and removal, an unsigned installer build, and application startup on GitHub's Windows Server 2022 runner with administrator privileges. These checks do not establish Windows 10/11 desktop usability or operation from a standard user account. The installer wizard and visible interface still need manual validation.
+
+Windows installation is configured for the current user, and the application manifest uses `asInvoker`. Fontcatch writes font files under the user's local application data and registration values under `HKEY_CURRENT_USER`; it does not request elevation. `asInvoker` preserves the caller's privileges, so running it from an elevated process still runs it elevated. The Windows preview has no code-signing certificate. The local macOS build is not a signed and notarized distribution release.
 
 See the [security and performance review](docs/security-and-performance.md) for the checks performed and unresolved dependency warnings. Linux distribution is blocked by the documented GTK/glib advisory. Fontcatch does not provide an independent security audit of downloaded fonts; the operating system and webview also parse those files.
 

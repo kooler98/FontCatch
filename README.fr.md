@@ -6,7 +6,7 @@
 
 **Télécharge une typo. Fontcatch s’occupe de l’installation.**
 
-Une petite app de bureau pour les designers qui préfèrent essayer une police plutôt que fouiller son ZIP. Fontcatch surveille tes téléchargements, repère les fichiers de police et les installe pour toi. Tes typos, leurs aperçus et l’historique restent réunis dans un panneau accessible depuis la barre de menu.
+Une petite app de bureau pour les designers qui préfèrent essayer une police plutôt que fouiller son ZIP. Fontcatch surveille tes téléchargements, repère les fichiers de police et les installe pour toi. Tes typos, leurs aperçus et l’historique restent réunis dans un panneau accessible depuis la barre de menu ou la zone de notification.
 
 [English](README.md) · [Comment ça marche](#comment-ça-marche) · [Commencer](#commencer) · [Contribuer](CONTRIBUTING.md) · [Signaler un problème](https://github.com/kooler98/FontCatch/issues) · [Licence MIT](LICENSE)
 
@@ -59,16 +59,26 @@ Le [compte rendu de sécurité et de performance](docs/security-and-performance.
 
 ## Commencer
 
-**Version actuelle : 0.3.4 alpha.**
+**Version actuelle : 0.3.5 alpha.**
 
-| Plateforme | État |
+**[Télécharger Fontcatch pour Windows x64](https://github.com/kooler98/FontCatch/releases/download/v0.3.5/Fontcatch_0.3.5_x64-setup.exe)** · [Notes de version et empreintes SHA-256](https://github.com/kooler98/FontCatch/releases/tag/v0.3.5)
+
+Pour **Windows 10/11 · x64**, télécharge l’installeur `.exe` ci-dessus, lance-le, puis ouvre Fontcatch depuis le menu Démarrer. L’installation concerne ton compte ; si WebView2 manque, l’installeur le télécharge.
+
+**macOS · Apple Silicon :** construis l’app depuis ses sources avec les instructions ci-dessous. Aucun binaire macOS n’est disponible au téléchargement.
+
+Laisse Fontcatch ouvert et télécharge une nouvelle police. Son icône dans la barre de menu ou la zone de notification permet d’ouvrir la bibliothèque et les réglages. Fermer le panneau laisse la détection active ; choisis **Quit Fontcatch** dans le menu de l’icône pour quitter l’app.
+
+L’installeur de test Windows n’est pas signé. Les builds macOS n’ont ni signature de distribution ni notarisation. Ton système peut afficher un avertissement ou bloquer leur ouverture.
+
+| Plateforme | Validation |
 | --- | --- |
-| macOS · Apple Silicon | Détection, installation, vrais aperçus et désinstallation confirmée vérifiés localement. |
-| macOS · Intel | Pas encore testé. |
-| Windows | Implémentation présente ; fonctionnement natif encore à valider. |
+| macOS · Apple Silicon | Version 0.3.5 construite localement. Détection, installation, aperçus et désinstallation confirmée vérifiés sur la 0.3.4 ; le code macOS est inchangé. L’interface de la 0.3.5 n’a pas été retestée manuellement. |
+| Windows 10/11 · x64 visé | [Vérifications Windows réussies](https://github.com/kooler98/FontCatch/actions/runs/40540707057) : 84 tests Rust, installation et retrait natifs de polices, création de l’installeur NSIS et démarrage de l’app. La validation manuelle de l’interface reste à faire. |
+| macOS · Intel | Pas encore testé ; aucune version Intel à télécharger. |
 | Linux | Expérimental. Fonctionnement natif non validé ; une alerte connue sur une dépendance GTK/glib doit être résolue avant distribution. |
 
-Aucune version binaire n’est encore publiée. Pour l’instant, il faut construire l’app depuis ses sources. Les installeurs macOS signés et notariés ne sont pas encore disponibles.
+La machine de test Windows utilise Windows Server 2022 x64 avec un compte administrateur. Cela ne remplace pas un test de l’interface sous Windows 10/11 avec un compte standard. Ces vérifications manuelles restent à faire, notamment la zone de notification, la mise à l’échelle de l’affichage et l’installation sans élévation des droits.
 
 ### Lancer depuis les sources
 
@@ -105,12 +115,13 @@ Ouvrir <http://127.0.0.1:1420>. Le mode navigateur utilise des données d’exem
 npm run build
 npm test
 npm run test:rust
+npm run test:tooling
 npm run test:ui
 ```
 
 Les tests Rust ordinaires utilisent des dossiers temporaires et une installation simulée. Les tests navigateur couvrent les aperçus, filtres, réglages, licences et confirmations de désinstallation. Ils utilisent Google Chrome lorsqu’il est disponible sur macOS, sinon Playwright Chromium (`npx playwright install chromium`). La variable `PLAYWRIGHT_CHROMIUM_EXECUTABLE` permet de choisir un autre exécutable.
 
-Un test macOS séparé, désactivé par défaut, installe une police synthétique originale dans le vrai dossier Fonts de l’utilisateur, puis la déplace vers la Corbeille. Lire [CONTRIBUTING.md](CONTRIBUTING.md) avant de l’exécuter.
+Des tests macOS et Windows séparés, désactivés par défaut, installent une police synthétique originale dans le vrai dossier de polices de l’utilisateur, vérifient son fonctionnement natif, puis la déplacent vers la Corbeille. Lire [CONTRIBUTING.md](CONTRIBUTING.md) avant de les exécuter.
 
 ## Données et structure du projet
 
@@ -130,7 +141,7 @@ Les liens du site et du soutien restent absents tant qu’ils ne sont pas config
 
 ## La suite
 
-Validation native de Windows, Linux et macOS Intel ; résolution des alertes de dépendances Linux ; installeurs signés et distribution ; puis mises à jour automatiques de l’app. Les tests sur d’autres systèmes et les signalements de bugs précis sont les bienvenus : voir [Contribuer](CONTRIBUTING.md).
+Tests manuels sous Windows 10/11, validation native de Linux et macOS Intel, résolution des alertes de dépendances Linux, installeurs signés et mises à jour automatiques de l’app. Les tests sur d’autres systèmes et les signalements de bugs précis sont les bienvenus : voir [Contribuer](CONTRIBUTING.md).
 
 ## Licence et crédits
 

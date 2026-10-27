@@ -6,7 +6,7 @@
 
 **Download a font. Fontcatch handles the install.**
 
-A small desktop app for designers who would rather try a typeface than dig through its ZIP file. Fontcatch watches your downloads, finds the desktop fonts inside, and installs them for you. Your fonts, previews and installation history stay together in a compact menu-bar panel.
+A small desktop app for designers who would rather try a typeface than dig through its ZIP file. Fontcatch watches your downloads, finds the desktop fonts inside, and installs them for you. Your fonts, previews and installation history stay together in a compact panel in your menu bar or system tray.
 
 [Français](README.fr.md) · [How it works](#how-it-works) · [Get started](#get-started) · [Contributing](CONTRIBUTING.md) · [Report an issue](https://github.com/kooler98/FontCatch/issues) · [MIT license](LICENSE)
 
@@ -59,16 +59,26 @@ See the [security and performance review](docs/security-and-performance.md) for 
 
 ## Get started
 
-**Current version: 0.3.4 alpha.**
+**Current version: 0.3.5 alpha.**
 
-| Platform | Status |
+**[Download Fontcatch for Windows x64](https://github.com/kooler98/FontCatch/releases/download/v0.3.5/Fontcatch_0.3.5_x64-setup.exe)** · [Release notes and SHA-256 checksums](https://github.com/kooler98/FontCatch/releases/tag/v0.3.5)
+
+For **Windows 10/11 · x64**, download the `.exe` installer above, run it, then open Fontcatch from the Start menu. It installs for your account; if WebView2 is missing, the installer downloads it.
+
+**macOS · Apple Silicon:** build from source using the instructions below. No macOS binary is available to download.
+
+Keep Fontcatch running and download a new font. Use its icon in the menu bar or system tray to open your library and settings. Closing the panel leaves detection running; choose **Quit Fontcatch** from the icon's menu to stop the app.
+
+The Windows preview installer is unsigned. macOS builds do not have distribution signing or notarization. Your operating system may warn about or block these builds.
+
+| Platform | Validation |
 | --- | --- |
-| macOS · Apple Silicon | Detection, installation, real previews and confirmed uninstallation verified locally. |
-| macOS · Intel | Not yet tested. |
-| Windows | Implementation included; native behavior not yet validated. |
+| macOS · Apple Silicon | 0.3.5 built locally. Detection, installation, previews and confirmed uninstallation were verified on 0.3.4; macOS code is unchanged. The 0.3.5 interface has not been retested manually. |
+| Windows 10/11 · x64 target | [Windows CI passed](https://github.com/kooler98/FontCatch/actions/runs/40540707057): 84 Rust tests, native font installation/removal, NSIS packaging and app startup checks. Manual desktop validation is still pending. |
+| macOS · Intel | Not yet tested; no Intel preview build. |
 | Linux | Experimental. Native behavior is unvalidated and a known GTK/glib dependency warning must be resolved before distribution. |
 
-There is no published binary release yet. The current route is to build from source. Signed and notarized macOS installers are not available yet.
+The Windows CI machine runs Windows Server 2022 x64 with an administrator account. It does not replace testing the interface on Windows 10/11 with a standard user account. Those manual checks remain pending, including tray behavior, display scaling and installation without elevation.
 
 ### Run from source
 
@@ -105,12 +115,13 @@ Open <http://127.0.0.1:1420>. Browser mode uses labeled sample data and separate
 npm run build
 npm test
 npm run test:rust
+npm run test:tooling
 npm run test:ui
 ```
 
 The ordinary Rust tests use temporary folders and simulated installation. Browser tests cover previews, filters, settings, license display and removal confirmations. They use Google Chrome when available on macOS, otherwise Playwright Chromium (`npx playwright install chromium`); `PLAYWRIGHT_CHROMIUM_EXECUTABLE` can select another executable.
 
-A separate, opt-in macOS smoke test installs an original synthetic test font into the real user Fonts folder and moves it to Trash afterward. See [CONTRIBUTING.md](CONTRIBUTING.md) before running it.
+Separate, opt-in macOS and Windows smoke tests install an original synthetic font into the real user Fonts folder, check native behavior, then remove it to Trash or the Recycle Bin. See [CONTRIBUTING.md](CONTRIBUTING.md) before running them.
 
 ## Data and project structure
 
@@ -130,7 +141,7 @@ Website and coffee links are unset until configured. Set HTTPS URLs in `websiteU
 
 ## What's next
 
-Native validation on Windows, Linux and Intel macOS; resolving the Linux dependency warnings; signed installers and release packaging; then automatic app updates. Platform testing and focused bug reports are welcome — see [Contributing](CONTRIBUTING.md).
+Manual Windows 10/11 testing, native validation on Linux and Intel macOS, resolving the Linux dependency warnings, signed installers and automatic app updates. Platform testing and focused bug reports are welcome — see [Contributing](CONTRIBUTING.md).
 
 ## License and credits
 

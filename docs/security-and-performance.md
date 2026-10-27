@@ -1,6 +1,6 @@
-# Security and performance review — 0.3.4
+# Security and performance review — 0.3.5 Windows preview
 
-Reviewed locally on 27 October 2026. This is a development review, not an independent security audit or a guarantee of safety for arbitrary fonts.
+Reviewed on 27 October 2026 using local macOS checks and Windows CI. This is a development review, not an independent security audit or a guarantee of safety for arbitrary fonts.
 
 ## Changes
 
@@ -14,6 +14,9 @@ Reviewed locally on 27 October 2026. This is a development review, not an indepe
 - Limit Tauri commands to an explicit local-panel capability. Deny remote page navigation and new webview windows; restrict external links to validated HTTP(S) URLs. Production developer tools are disabled. CSP forbids frames, embedded objects, base URL changes and form submissions.
 - Replace the unmaintained font metadata parser with Fontations `read-fonts`. Validate font table bounds, unique table tags, the header and required metadata before installation or preview. TTC preview extraction remains in memory and never rewrites the installed collection.
 - Update `zip` to 9.1.2 and retain only the required Deflate backend. Enable release size optimization and thin LTO.
+- On Windows, use the current user's font directory and `HKEY_CURRENT_USER`. Registry value names include the owned filename, so a new version can be registered without overwriting the old version or another application's mapping. Check every destination value before loading the font; remove only values whose type and UTF-16 path match the owned file. Preserve legacy mappings that point elsewhere. On a registry-write failure, attempt to remove values written by that attempt and release its font resource; the installation journal supports cleanup if rollback is incomplete.
+- Preserve Windows paths as UTF-16 rather than converting them through lossy UTF-8. Reject embedded NULs, paths outside the configured font directory, and filenames that do not match Fontcatch's generated format. Track registrations within the process to avoid repeated resource additions; bound native unregistration attempts. Files that remain locked are handled by the existing uninstall error and rollback path.
+- Deliver Windows font-change notifications asynchronously. Embed a Common-Controls v6 manifest in both the application and Rust test executables; this addresses the upstream [Tauri test-loader issue](https://github.com/tauri-apps/tauri/issues/13419). The manifest requests `asInvoker` with `uiAccess=false`, without requesting elevation.
 
 ## Dependency audit
 
@@ -31,7 +34,7 @@ Remaining RustSec **warnings are not hidden or ignored**:
 
 These packages are absent from the `aarch64-apple-darwin` dependency tree. The lockfile includes dependencies for all supported platforms. A successful `cargo audit` exit alone does not mean that every warning is resolved.
 
-## Verification
+## Previous macOS verification — 0.3.4
 
 - 83 Rust tests: archive traversal and expansion limits, raw ZIP metadata limits and stable snapshots, malformed fonts, symlinks, duplicate/update handling, recovery after interrupted operations, guarded uninstall, URL migration, bounded history and live macOS filesystem events.
 - 8 TypeScript tests and 8 browser interaction tests, including real FontFace loading from synthetic fixtures, per-style previews, license text rendering, confirmation/cancellation, stale uninstall plans and a 130-entry history.
@@ -41,4 +44,21 @@ These packages are absent from the `aarch64-apple-darwin` dependency tree. The l
 
 The 0.3.4 Apple Silicon build contains 16,594,347 bytes (15.83 MiB); its verified ZIP is 4,466,764 bytes, compared with 5,217,712 bytes for 0.3.0. This is a package-size measurement, not a claim of equivalent RAM savings. Full fallback directory scans are 15 times less frequent at idle; event-driven detection is retained.
 
-Windows and Linux native behavior still require verification on those systems. Fonts are also parsed by the OS and system webview; keeping those components updated remains necessary. The local Apple Silicon build is not a signed/notarized distribution release.
+## Verification — 0.3.5
+
+The frontend build, 3 native-launcher tests, 8 TypeScript tests, 8 browser interaction tests, and `npm audit` passed for 0.3.5.
+
+The same CI run passed macOS formatting, Clippy and 83 Rust tests. The Apple Silicon application bundle was also built locally; its interface was not retested manually for 0.3.5.
+
+The [Windows x64 CI job](https://github.com/kooler98/FontCatch/actions/runs/40540707057/job/122318362840) passed all of the following checks:
+
+- Clippy for all Windows targets with warnings treated as errors, and **84 Rust tests passed** on `x86_64-pc-windows-msvc`. The native smoke test was excluded from the ordinary suite and then run separately.
+- **1 native smoke test passed**: installed the original CC0 synthetic fixture, verified the actual font family selected by GDI, verified registry values, repeated registration, unregistered the font, moved its file to the Recycle Bin, and confirmed that the source fixture was unchanged. The test refuses to proceed if the test font or destination already exists.
+- Built an unsigned **2.66 MiB NSIS installer**, configured for the current user.
+- Started the release application executable, verified that it remained running for ten seconds and initialized its library database. This check did not run the NSIS installer or exercise the visible interface.
+
+The runner is **Windows Server 2022 with administrator privileges**. These checks do not validate a Windows 10/11 interactive desktop session, a standard user account, the installer/uninstaller wizard, tray positioning, application previews in WebView2, reboot persistence, or fonts held open by other applications. Those remain separate validation tasks. The application is configured to avoid requesting elevation, but `asInvoker` inherits its caller's token and does not turn an administrator CI process into a standard user process.
+
+Windows preview packages have **no code-signing certificate**. Building an installer, passing tests, and applying a Windows manifest do not provide publisher verification or an independent security audit. The local Apple Silicon build is not a signed/notarized distribution release. Linux distribution remains blocked by the GTK/glib advisory above.
+
+Fonts are also parsed by the OS and system webview; keeping those components updated remains necessary.
