@@ -1,0 +1,38 @@
+{
+  "retrieved": "2026-10-27",
+  "site": "https://www.beautifului.dev/",
+  "license": "https://www.beautifului.dev/license",
+  "copyright": "Copyright (c) 2026 Shane Levine",
+  "observedStack": [
+    "React hooks and TSX",
+    "Tailwind utility classes",
+    "CSS keyframes and transitions; no animation library imports in the selected components"
+  ],
+  "components": [
+    {
+      "name": "Search",
+      "sha256Original": "fc9fb6129778fd335e40b5fa231a4f5c4761b89b23756ef082eca79cd7ed476f",
+      "source": "https://www.beautifului.dev/#search"
+    },
+    {
+      "name": "FilterTable",
+      "sha256Original": "cfd1c6f9aa6503b55346950260b13370e25b4c5f67ad3bbcefb15f3a0d28e5cc",
+      "source": "https://www.beautifului.dev/#filter-table"
+    },
+    {
+      "name": "TaskRows",
+      "sha256Original": "9312c7627f4012cb9c26c1bb6cca24467fbdb7f28504503233b77a1c322b0122",
+      "source": "https://www.beautifului.dev/#task-rows"
+    },
+    {
+      "name": "ApprovalCard",
+      "sha256Original": "d81b27882edb47b688afd5eb65564f3f5e3d31c200b06ea679e2ccb02440b076",
+      "source": "https://www.beautifului.dev/#approval-card"
+    },
+    {
+      "name": "LoadingState",
+      "sha256Original": "a96c8f8d36bb1b65eed14f4e10eb72bd2d9aaf113ebd75c32b6f5b4fd44aece3",
+      "source": "https://www.beautifului.dev/#loading-state"
+    }
+  ]
+}

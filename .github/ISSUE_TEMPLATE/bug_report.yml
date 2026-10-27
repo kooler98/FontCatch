@@ -1,0 +1,42 @@
+name: Bug report
+description: Report a reproducible Fontcatch problem.
+title: "[Bug] "
+body:
+  - type: markdown
+    attributes:
+      value: Please do not upload purchased fonts, private download links, or your library database. Use an original or openly licensed sample when possible.
+  - type: input
+    id: environment
+    attributes:
+      label: App version and operating system
+      placeholder: Fontcatch 0.3.4, macOS, Apple Silicon
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Installation mode
+      options:
+        - Ask
+        - Automatic
+        - Not applicable
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Include the file type (ZIP, TTF, OTF, TTC) when relevant.
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Expected and actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Additional details
+      description: Optional screenshots or error text, with personal paths and download URLs removed.
