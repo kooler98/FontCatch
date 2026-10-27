@@ -1,0 +1,38 @@
+node_modules/
+dist/
+.tooling/
+src-tauri/target/
+deliverables/
+*.tsbuildinfo
+test-results/
+playwright-report/
+.DS_Store
+*.key
+*.pem
+qa/downloads/
+
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+.codex/
+.agents/
+.aws/
+*.log
+
+# Local application data and generated schemas
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+src-tauri/gen/
+qa/
+
+# Private project brief and local validation notes
+docs/brief-original.txt
+docs/phase-*.md
+docs/screenshots/*
+
+# Generated mobile icons are outside this desktop app's scope
+src-tauri/icons/android/
+src-tauri/icons/ios/
