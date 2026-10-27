@@ -156,5 +156,7 @@
   "showMore": "Show more",
   "engine_busy": "An operation is in progress. Try again in a moment.",
   "engine_unavailable": "The font engine is unavailable. Restart Fontcatch.",
-  "invalid_data_directory": "The data directory cannot be used."
+  "invalid_data_directory": "The data directory cannot be used.",
+  "font_registration_failed": "Windows could not load this font.",
+  "font_unregistration_failed": "Windows could not unload this font. Close applications using it and try again."
 }

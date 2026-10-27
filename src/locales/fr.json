@@ -156,5 +156,7 @@
   "showMore": "Afficher plus",
   "engine_busy": "Une opération est en cours. Réessaie dans un instant.",
   "engine_unavailable": "Le moteur de polices est indisponible. Relance Fontcatch.",
-  "invalid_data_directory": "Le dossier de données ne peut pas être utilisé."
+  "invalid_data_directory": "Le dossier de données ne peut pas être utilisé.",
+  "font_registration_failed": "Windows n’a pas pu charger cette police.",
+  "font_unregistration_failed": "Windows n’a pas pu décharger cette police. Ferme les applications qui l’utilisent, puis réessaie."
 }

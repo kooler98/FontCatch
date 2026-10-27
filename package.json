@@ -1,7 +1,7 @@
 {
   "name": "fontcatch",
   "private": true,
-  "version": "0.3.4",
+  "version": "0.3.5",
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 1420 --strictPort",
@@ -15,7 +15,8 @@
     "icons": "node scripts/icons.mjs && tauri icon src/assets/brand/app-icon.png",
     "test:ui": "playwright test",
     "format": "prettier --write src scripts tests *.json *.ts index.html",
-    "format:rust": "node scripts/native.mjs cargo fmt --manifest-path src-tauri/Cargo.toml"
+    "format:rust": "node scripts/native.mjs cargo fmt --manifest-path src-tauri/Cargo.toml",
+    "test:tooling": "node --test scripts/native.test.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.0.0",
