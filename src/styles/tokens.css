@@ -1,0 +1,91 @@
+@import "tailwindcss" source("../");
+/* One place to restyle the product. Lilac always sits on brown. */
+:root {
+  color-scheme: light;
+  --fc-bg: #a69696;
+  --fc-brown: #3b1102;
+  --fc-lilac: #d3a9ff;
+  --fc-text: #24120d;
+  --fc-muted: #503b36;
+  --fc-surface: #b9aaa8;
+  --fc-inset: #ad9d9b;
+  --fc-hover: #c3b4b1;
+  --fc-border: #8d7771;
+  --fc-soft-border: #97817c;
+  --fc-error: #6b1708;
+  --fc-radius: 12px;
+  --fc-font:
+    -apple-system, BlinkMacSystemFont, "Segoe UI Variable", "Segoe UI",
+    system-ui, sans-serif;
+  --fc-shadow: 0 1px 1px #3b11020a, 0 3px 8px #3b11020a;
+  /* Beautiful UI semantic mapping */
+  --ink: var(--fc-text);
+  --ink-2: var(--fc-muted);
+  --ink-3: var(--fc-muted);
+  --surface: var(--fc-surface);
+  --field: var(--fc-inset);
+  --hover: var(--fc-hover);
+  --line: var(--fc-soft-border);
+  --inset: var(--fc-inset);
+}
+@theme inline {
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-surface: var(--surface);
+  --color-field: var(--field);
+  --color-line: var(--line);
+  --color-hover: var(--hover);
+  --color-inset: var(--inset);
+  --radius-card: var(--fc-radius);
+  --shadow-card: var(--fc-shadow);
+  --shadow-btn: var(--fc-shadow);
+  --font-sans: var(--fc-font);
+}
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97) translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes pixel-on {
+  0%,
+  100% {
+    opacity: 0.15;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
