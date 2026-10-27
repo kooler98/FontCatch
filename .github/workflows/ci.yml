@@ -34,6 +34,8 @@ jobs:
         run: npm run build
       - name: Test frontend logic
         run: npm test
+      - name: Test native launcher
+        run: npm run test:tooling
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
       - name: Test browser interactions
@@ -70,3 +72,77 @@ jobs:
         run: cargo clippy --locked --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
       - name: Test Rust logic
         run: cargo test --locked --manifest-path src-tauri/Cargo.toml
+
+  windows:
+    name: Windows x64 checks and installer
+    runs-on: windows-2022
+    timeout-minutes: 45
+    steps:
+      - name: Check out source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: "24"
+          package-manager-cache: false
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          toolchain: stable
+          targets: x86_64-pc-windows-msvc
+          components: clippy
+      - name: Install frontend dependencies
+        run: npm ci
+      - name: Test native launcher
+        run: npm run test:tooling
+      - name: Build frontend assets
+        run: npm run build
+      - name: Check Windows Rust lints
+        run: cargo clippy --locked --manifest-path src-tauri/Cargo.toml --target x86_64-pc-windows-msvc --all-targets -- -D warnings
+      - name: Test Windows Rust logic
+        run: cargo test --locked --manifest-path src-tauri/Cargo.toml --target x86_64-pc-windows-msvc
+      - name: Test native user-font installation and removal
+        env:
+          FONTCATCH_WINDOWS_SMOKE: "1"
+        run: cargo test --locked --manifest-path src-tauri/Cargo.toml --target x86_64-pc-windows-msvc installer::windows::tests::windows_native_install_uninstall_smoke -- --ignored --exact --nocapture
+      - name: Build unsigned NSIS installer
+        run: npm run desktop:build -- --ci --no-sign --target x86_64-pc-windows-msvc --bundles nsis -- --locked
+      - name: Check packaged app startup
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $fontcatchExe = (Resolve-Path 'src-tauri/target/x86_64-pc-windows-msvc/release/fontcatch.exe').Path
+          # Tauri app_data_dir is FOLDERID_RoamingAppData / bundle identifier.
+          $fontcatchDatabase = Join-Path ([Environment]::GetFolderPath('ApplicationData')) 'app.fontcatch.desktop/library.sqlite'
+          if (Test-Path $fontcatchDatabase) {
+            throw 'Expected a fresh Fontcatch database on this disposable runner.'
+          }
+          $fontcatchProcess = Start-Process -FilePath $fontcatchExe -ArgumentList '--autostart' -PassThru
+          try {
+            Start-Sleep -Seconds 10
+            $fontcatchProcess.Refresh()
+            if ($fontcatchProcess.HasExited) {
+              throw "Fontcatch exited during startup (code $($fontcatchProcess.ExitCode))."
+            }
+            if (!(Test-Path -Path $fontcatchDatabase -PathType Leaf) -or (Get-Item $fontcatchDatabase).Length -eq 0) {
+              throw 'Fontcatch did not initialize its library database.'
+            }
+            Write-Host 'Fontcatch stayed running and initialized its library database.'
+          } finally {
+            $fontcatchProcess.Refresh()
+            if (!$fontcatchProcess.HasExited) {
+              Stop-Process -Id $fontcatchProcess.Id -Force
+              $fontcatchProcess.WaitForExit(5000) | Out-Null
+            }
+            $fontcatchProcess.Dispose()
+          }
+      - name: Upload unsigned Windows installer
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: Fontcatch-Windows-x64-unsigned-${{ github.run_id }}-${{ github.run_attempt }}
+          path: src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
