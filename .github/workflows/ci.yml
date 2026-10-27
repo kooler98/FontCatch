@@ -5,6 +5,12 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+    inputs:
+      publish_preview:
+        description: Publish a Windows preview after all checks pass
+        type: boolean
+        required: true
+        default: false
 
 permissions:
   contents: read
@@ -146,3 +152,100 @@ jobs:
           if-no-files-found: error
           retention-days: 14
           compression-level: 0
+
+  publish_preview:
+    name: Publish Windows preview
+    needs: [frontend, native, windows]
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_preview && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - name: Check out verified source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - name: Check release version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os, re, tomllib
+          from pathlib import Path
+
+          package = json.loads(Path('package.json').read_text())
+          tauri = json.loads(Path('src-tauri/tauri.conf.json').read_text())
+          cargo = tomllib.loads(Path('src-tauri/Cargo.toml').read_text())
+          version = package['version']
+          if not re.fullmatch(r'(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)', version):
+              raise SystemExit('Expected a numeric release version.')
+          if version != tauri['version'] or version != cargo['package']['version']:
+              raise SystemExit('Package, Tauri and Cargo versions must agree.')
+          if tauri['productName'] != 'Fontcatch':
+              raise SystemExit('Unexpected installer product name.')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write(f'version={version}\n')
+          PY
+      - name: Download and verify this run's installer
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FONTCATCH_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" \
+            --name "Fontcatch-Windows-x64-unsigned-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            --dir "$RUNNER_TEMP/fontcatch-preview"
+          python3 - <<'PY'
+          import hashlib, os
+          from pathlib import Path
+
+          directory = Path(os.environ['RUNNER_TEMP']) / 'fontcatch-preview'
+          version = os.environ['FONTCATCH_VERSION']
+          installer = directory / f'Fontcatch_{version}_x64-setup.exe'
+          if list(directory.iterdir()) != [installer] or installer.is_symlink() or not installer.is_file():
+              raise SystemExit('Expected exactly one installer matching the verified version.')
+          with installer.open('rb') as source:
+              if source.read(2) != b'MZ':
+                  raise SystemExit('Installer is not a Windows executable.')
+              source.seek(0)
+              digest = hashlib.file_digest(source, 'sha256').hexdigest()
+          (directory / 'SHA256SUMS.txt').write_text(f'{digest}  {installer.name}\n')
+          run_url = f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}"
+          (directory / 'release-notes.md').write_text(f'''Windows x64 preview of Fontcatch {version}.
+
+          Download the `.exe` installer and open Fontcatch from the Start menu. Installation is configured for the current user. The installer downloads WebView2 if it is missing.
+
+          [Verified CI run]({run_url}) built this installer from commit `{os.environ['GITHUB_SHA']}` after frontend, macOS and Windows checks passed. Windows checks cover Rust tests, native font registration and removal, and app startup with database initialization.
+
+          This installer is unsigned. Windows may warn about or block it. CI runs on Windows Server 2022 x64 with an administrator account; manual Windows 10/11 checks remain pending, including tray behavior, display scaling and installation with a standard user account. The installer itself has not been exercised interactively.
+
+          This release contains the Windows installer only. macOS and Linux binaries are not included. `SHA256SUMS.txt` records the installer checksum.
+          ''')
+          PY
+      - name: Create a new prerelease without replacing existing tags or releases
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FONTCATCH_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          tag="v${FONTCATCH_VERSION}"
+          refs=$(gh api "repos/$GITHUB_REPOSITORY/git/matching-refs/tags/$tag" --jq '.[].ref')
+          releases=$(gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" --jq '.[].tag_name')
+          if grep -Fxq "refs/tags/$tag" <<< "$refs" || grep -Fxq "$tag" <<< "$releases"; then
+            echo "Refusing to replace an existing tag or release: $tag" >&2
+            exit 1
+          fi
+          # Creating a reference fails if it appeared after the checks above.
+          gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" \
+            -f "ref=refs/tags/$tag" -f "sha=$GITHUB_SHA" --silent
+          gh release create "$tag" \
+            "$RUNNER_TEMP/fontcatch-preview/Fontcatch_${FONTCATCH_VERSION}_x64-setup.exe" \
+            "$RUNNER_TEMP/fontcatch-preview/SHA256SUMS.txt" \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --verify-tag \
+            --prerelease --latest=false --title "Fontcatch ${FONTCATCH_VERSION} — Windows preview" \
+            --notes-file "$RUNNER_TEMP/fontcatch-preview/release-notes.md"
