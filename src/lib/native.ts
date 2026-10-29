@@ -68,6 +68,11 @@ export interface UninstallOutcome {
   removedCount: number;
   error: string | null;
 }
+export interface Woff2Export {
+  fileName: string;
+  inputBytes: number;
+  outputBytes: number;
+}
 export const emptySnapshot: Snapshot = {
   recent: [],
   installed: [],

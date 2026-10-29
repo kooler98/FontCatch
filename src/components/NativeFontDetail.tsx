@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Icon } from "./Icon";
+import { ExportWoff2Button } from "./ExportWoff2Button";
 import { message } from "./RecentCatches";
 import { preferredFont, useFontPreview } from "../lib/font-preview";
 import {
@@ -41,6 +42,7 @@ export function NativeFontDetail({
   const [size, setSize] = useState(30);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [plan, setPlan] = useState<UninstallPlan | null>(null);
   const dialog = useRef<HTMLDialogElement>(null);
   const preview = useFontPreview(selected);
@@ -123,6 +125,7 @@ export function NativeFontDetail({
         {t.style}
         <select
           aria-label={t.chooseStyle}
+          disabled={exporting}
           value={selected.face.postscript}
           onChange={(e) => setPostscript(e.target.value)}
         >
@@ -134,6 +137,15 @@ export function NativeFontDetail({
           ))}
         </select>
       </label>
+      <ExportWoff2Button
+        postscript={face.postscript}
+        styleName={face.style}
+        t={t}
+        language={language}
+        disabled={busy}
+        onBusyChange={setExporting}
+        onNotice={onNotice}
+      />
       <label className="preview-label" htmlFor="native-font-preview">
         {t.realPreview}
       </label>
@@ -257,7 +269,7 @@ export function NativeFontDetail({
       )}
       <button
         className="uninstall-button"
-        disabled={busy}
+        disabled={busy || exporting}
         onClick={() => void prepare()}
       >
         {busy ? t.preparingUninstall : t.uninstallFamily}

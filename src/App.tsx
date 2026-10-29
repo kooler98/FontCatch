@@ -4,6 +4,7 @@ import {
 } from "@tauri-apps/plugin-notification";
 import { RecentCatches, message } from "./components/RecentCatches";
 import { NativeFontDetail } from "./components/NativeFontDetail";
+import { ExportWoff2Button } from "./components/ExportWoff2Button";
 import { NativeFontSample } from "./components/NativeFontSample";
 import { preferredFont } from "./lib/font-preview";
 import { version } from "../package.json";
@@ -552,6 +553,12 @@ export default function App() {
                 {t.families}
               </span>
             </div>
+            <ExportWoff2Button
+              postscript={null}
+              t={t}
+              language={settings.language}
+              onNotice={setNotice}
+            />
             <Search
               value={query}
               onChange={setQuery}

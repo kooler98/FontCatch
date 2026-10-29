@@ -39,6 +39,10 @@ export function RecentCatches({
   const [historyLimit, setHistoryLimit] = useState(50);
   const pending = snapshot.recent.filter((j) => j.status === "pending");
   const history = snapshot.recent.filter((j) => j.status !== "pending");
+  const watcherStarting = snapshot.watcherErrors.includes("watcher_starting");
+  const watcherErrors = snapshot.watcherErrors.filter(
+    (error) => error !== "watcher_starting",
+  );
   return (
     <>
       <div className="section-title">
@@ -51,10 +55,15 @@ export function RecentCatches({
           </span>
         )}
       </div>
-      {snapshot.watcherErrors.length > 0 && (
+      {watcherStarting && (
+        <div className="watcher-warning" role="status">
+          {t.watcherStarting}
+        </div>
+      )}
+      {watcherErrors.length > 0 && (
         <div className="watcher-warning" role="status">
           {t.watchWarning}
-          {snapshot.watcherErrors.map((e) => (
+          {watcherErrors.map((e) => (
             <p key={e}>
               {e.startsWith("folder_unavailable:")
                 ? e.slice("folder_unavailable:".length)

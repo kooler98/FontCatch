@@ -1,4 +1,5 @@
 mod engine;
+mod export;
 mod extractor;
 mod files;
 mod inspector;
@@ -11,11 +12,50 @@ mod preview;
 mod settings;
 mod urls;
 mod watcher;
+mod woff2;
 use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{Emitter, Manager};
 use tauri_plugin_opener::OpenerExt;
 #[derive(Default)]
 struct DialogState(AtomicBool);
+
+#[derive(Default)]
+struct ExportState(AtomicBool);
+
+// Separate from the settings dialog flag: neither dialog can accidentally clear
+// the other's focus protection while a conversion is running.
+struct ExportSession(tauri::AppHandle);
+impl Drop for ExportSession {
+    fn drop(&mut self) {
+        self.0
+            .state::<ExportState>()
+            .0
+            .store(false, Ordering::SeqCst);
+        panel::show(&self.0, None);
+    }
+}
+
+#[tauri::command]
+async fn export_woff2(
+    app: tauri::AppHandle,
+    postscript: Option<String>,
+) -> Result<Option<export::ExportOutcome>, String> {
+    if app
+        .state::<ExportState>()
+        .0
+        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+        .is_err()
+    {
+        return Err("woff2_busy".into());
+    }
+    let session = ExportSession(app.clone());
+    tauri::async_runtime::spawn_blocking(move || {
+        let _session = session;
+        export::run(&app, postscript)
+    })
+    .await
+    .map_err(|_| "woff2_conversion_failed".to_string())?
+}
 
 #[tauri::command]
 fn set_dialog_active(app: tauri::AppHandle, active: bool) {
@@ -34,6 +74,10 @@ async fn save_settings(
     app: tauri::AppHandle,
     settings: settings::Settings,
 ) -> Result<settings::Settings, String> {
+    let handle = app.state::<engine::EngineHandle>().inner().clone();
+    // Baseline creation can wait on an OS folder permission. Reject changes
+    // before persisting or announcing settings the worker cannot apply yet.
+    handle.ensure_watcher_ready()?;
     let saved = settings::write(&app, settings)?;
     if let Some(tray) = app.tray_by_id("fontcatch") {
         let menu = panel::menu(&app, &saved.language).map_err(|e| e.to_string())?;
@@ -41,7 +85,6 @@ async fn save_settings(
     }
     app.emit("settings-changed", &saved)
         .map_err(|e| e.to_string())?;
-    let handle = app.state::<engine::EngineHandle>().inner().clone();
     let updated = saved.clone();
     tauri::async_runtime::spawn_blocking(move || {
         handle.request(|reply| engine::Message::Configure(updated, reply))
@@ -69,6 +112,9 @@ fn open_link(app: tauri::AppHandle, key: String) -> Result<(), String> {
 }
 #[tauri::command]
 fn hide_panel(app: tauri::AppHandle) -> Result<(), String> {
+    if app.state::<ExportState>().0.load(Ordering::SeqCst) {
+        return Ok(());
+    }
     app.get_webview_window("main")
         .ok_or("Panel unavailable")?
         .hide()
@@ -176,6 +222,7 @@ async fn uninstall_family(
 pub fn run() {
     tauri::Builder::default()
         .manage(DialogState::default())
+        .manage(ExportState::default())
         .plugin(tauri_plugin_single_instance::init(|app, _, _| {
             panel::show(app, None)
         }))
@@ -194,6 +241,7 @@ pub fn run() {
             install_font,
             ignore_font,
             read_font_preview,
+            export_woff2,
             reveal_font,
             open_font_license,
             plan_uninstall,
@@ -233,13 +281,17 @@ pub fn run() {
         })
         .on_window_event(|window, event| match event {
             tauri::WindowEvent::Focused(false) => {
-                if !window.state::<DialogState>().0.load(Ordering::SeqCst) {
+                if !window.state::<DialogState>().0.load(Ordering::SeqCst)
+                    && !window.state::<ExportState>().0.load(Ordering::SeqCst)
+                {
                     let _ = window.hide();
                 }
             }
             tauri::WindowEvent::CloseRequested { api, .. } => {
                 api.prevent_close();
-                let _ = window.hide();
+                if !window.state::<ExportState>().0.load(Ordering::SeqCst) {
+                    let _ = window.hide();
+                }
             }
             #[cfg(target_os = "windows")]
             tauri::WindowEvent::ThemeChanged(_) => {

@@ -17,6 +17,13 @@ async function mockNative(
     corrupt?: boolean;
     stale?: boolean;
     historyCount?: number;
+    emptyRecent?: boolean;
+    watcherErrors?: string[];
+    language?: "en" | "fr";
+    exportCancel?: boolean;
+    exportError?: string;
+    exportDeferred?: boolean;
+    exportFileName?: string;
   } = {},
 ) {
   await page.addInitScript(
@@ -77,16 +84,18 @@ async function mockNative(
         planned: [],
       };
       const snapshot: any = {
-        recent: options.historyCount
-          ? Array.from({ length: options.historyCount }, (_, i) => ({
-              ...job,
-              id: `history-${i}`,
-              status: "installed",
-            }))
-          : [job],
+        recent: options.emptyRecent
+          ? []
+          : options.historyCount
+            ? Array.from({ length: options.historyCount }, (_, i) => ({
+                ...job,
+                id: `history-${i}`,
+                status: "installed",
+              }))
+            : [job],
         installed: options.installed ? fonts : [],
         processing: null,
-        watcherErrors: [],
+        watcherErrors: options.watcherErrors ?? [],
       };
       w.__fontcatchTestCalls = [];
       const emit = () => {
@@ -113,7 +122,7 @@ async function mockNative(
               mode: "ask",
               fontPreference: "variable",
               trashAfterInstall: false,
-              language: "en",
+              language: options.language ?? "en",
               folders: ["/qa"],
             };
           if (
@@ -126,6 +135,21 @@ async function mockNative(
             return next;
           }
           if (cmd === "get_snapshot") return structuredClone(snapshot);
+          if (cmd === "export_woff2") {
+            if (options.exportDeferred)
+              await new Promise<void>((resolve) => {
+                w.__finishWoff2Export = resolve;
+              });
+            if (options.exportCancel) return null;
+            if (options.exportError) throw options.exportError;
+            return {
+              fileName:
+                options.exportFileName ??
+                `${args.postscript ?? "External-Font"}.woff2`,
+              inputBytes: 10000,
+              outputBytes: 2400,
+            };
+          }
           if (cmd === "read_font_preview")
             return options.corrupt
               ? [1, 2, 3]
@@ -336,4 +360,186 @@ test("failed previews remain explicit and stale uninstall consent cannot remove 
     .click();
   await expect(page.getByRole("alert")).toContainText("The library changed.");
   await expect(page.locator(".native-detail h1")).toHaveText("Fontcatch QA");
+});
+
+test("WOFF2 exports the selected installed style without installing or removing fonts", async ({
+  page,
+}) => {
+  await mockNative(page, { installed: true });
+  await page.goto("/");
+  await openFamily(page);
+  await page.getByLabel("Choose a style").selectOption("FontcatchQA-Bold");
+  await expect(page.locator(".woff2-context")).toHaveText("Bold");
+  await page
+    .getByRole("button", { name: "Export WOFF2 — Bold", exact: true })
+    .click();
+  await expect(page.locator(".toast")).toContainText(
+    "FontcatchQA-Bold.woff2 saved · 2.4 kB",
+  );
+  expect(await calls(page, "export_woff2")).toEqual([
+    { cmd: "export_woff2", args: { postscript: "FontcatchQA-Bold" } },
+  ]);
+  expect(await calls(page, "install_font")).toHaveLength(0);
+  expect(await calls(page, "uninstall_family")).toHaveLength(0);
+});
+
+for (const language of ["en", "fr"] as const) {
+  test(`folder monitoring startup keeps conversion available (${language})`, async ({
+    page,
+  }) => {
+    const french = language === "fr";
+    await mockNative(page, {
+      language,
+      emptyRecent: true,
+      watcherErrors: ["watcher_starting"],
+    });
+    await page.goto("/");
+    await expect(page.getByRole("status")).toHaveText(
+      french
+        ? "Démarrage de la surveillance. Si l’attente se prolonge, vérifie si le système demande l’accès aux dossiers."
+        : "Starting folder monitoring. Check for a system folder access prompt if this takes longer.",
+    );
+    await expect(
+      page.getByText(
+        french
+          ? "Un dossier ne peut pas être surveillé :"
+          : "A folder cannot be watched:",
+      ),
+    ).toHaveCount(0);
+    await expect(page.getByText("watcher_starting")).toHaveCount(0);
+    await page
+      .getByRole("tab", { name: french ? "Bibliothèque" : "Library" })
+      .click();
+    const convert = page.getByRole("button", {
+      name: french ? "Convertir un fichier…" : "Convert file…",
+    });
+    await expect(convert).toBeEnabled();
+    await convert.click();
+    await expect(page.locator(".toast")).toContainText("External-Font.woff2");
+    expect(await calls(page, "export_woff2")).toEqual([
+      { cmd: "export_woff2", args: { postscript: null } },
+    ]);
+    expect(await calls(page, "install_font")).toHaveLength(0);
+  });
+}
+
+test("external WOFF2 conversion is available in an empty library and never installs the file", async ({
+  page,
+}) => {
+  const fileName = `${"Long-font-family-name-".repeat(8)}Regular.woff2`;
+  await mockNative(page, { exportFileName: fileName });
+  await page.goto("/");
+  await page.getByRole("tab", { name: "Library" }).click();
+  await expect(page.getByText("No fonts installed")).toBeVisible();
+  await expect(page.getByText("TTF / OTF → WOFF2")).toBeVisible();
+  await page.getByRole("button", { name: "Convert file…" }).click();
+  await expect(page.locator(".toast")).toContainText(`${fileName} saved`);
+  expect(await calls(page, "export_woff2")).toEqual([
+    { cmd: "export_woff2", args: { postscript: null } },
+  ]);
+  expect(await calls(page, "install_font")).toHaveLength(0);
+  await expect(page.getByText("No fonts installed")).toBeVisible();
+  const toast = await page.locator(".toast").boundingBox();
+  expect(toast!.x).toBeGreaterThanOrEqual(16);
+  expect(toast!.x + toast!.width).toBeLessThanOrEqual(344);
+  expect(
+    await page
+      .locator(".panel-content")
+      .evaluate((el) => el.scrollWidth <= el.clientWidth),
+  ).toBe(true);
+});
+
+for (const installed of [false, true]) {
+  test(`cancelling ${installed ? "an installed-style export" : "an external conversion"} is quiet`, async ({
+    page,
+  }) => {
+    await mockNative(page, { installed, exportCancel: true });
+    await page.goto("/");
+    if (installed) await openFamily(page);
+    else await page.getByRole("tab", { name: "Library" }).click();
+    const button = page.getByRole("button", {
+      name: installed ? "Export WOFF2 — Regular" : "Convert file…",
+      exact: true,
+    });
+    await button.click();
+    await expect(button).toBeEnabled();
+    await expect(page.locator(".toast")).toHaveCount(0);
+    await expect(page.getByRole("alert")).toHaveCount(0);
+    expect(await calls(page, "export_woff2")).toEqual([
+      {
+        cmd: "export_woff2",
+        args: { postscript: installed ? "FontcatchQA-Regular" : null },
+      },
+    ]);
+    expect(await calls(page, "install_font")).toHaveLength(0);
+  });
+}
+
+test("WOFF2 errors are localized and conversion remains retryable", async ({
+  page,
+}) => {
+  await mockNative(page, {
+    language: "fr",
+    exportError: "woff2_destination_exists",
+  });
+  await page.goto("/");
+  await page.getByRole("tab", { name: "Bibliothèque" }).click();
+  const button = page.getByRole("button", { name: "Convertir un fichier…" });
+  await button.click();
+  await expect(page.getByRole("alert")).toHaveText(
+    "Un fichier porte déjà ce nom. Choisis un autre nom ; aucun fichier n’a été remplacé.",
+  );
+  await expect(button).toBeEnabled();
+  await button.click();
+  expect(await calls(page, "export_woff2")).toHaveLength(2);
+  await expect(page.locator(".toast")).toHaveCount(0);
+});
+
+for (const exportError of ["/private/path: internal failure", "__proto__"]) {
+  test(`unexpected WOFF2 failures use a readable fallback (${exportError})`, async ({
+    page,
+  }) => {
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    await mockNative(page, { exportError });
+    await page.goto("/");
+    await page.getByRole("tab", { name: "Library" }).click();
+    await page.getByRole("button", { name: "Convert file…" }).click();
+    await expect(page.getByRole("alert")).toHaveText(
+      "This font could not be converted to WOFF2.",
+    );
+    await expect(page.getByText(exportError, { exact: true })).toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
+}
+
+test("WOFF2 conversion blocks duplicate clicks and style changes until completion", async ({
+  page,
+}) => {
+  await mockNative(page, { installed: true, exportDeferred: true });
+  await page.goto("/");
+  await openFamily(page);
+  const button = page.getByRole("button", {
+    name: "Export WOFF2 — Regular",
+    exact: true,
+  });
+  // Two clicks in one task also exercise the lock before React renders disabled.
+  await button.evaluate((element) => {
+    element.click();
+    element.click();
+  });
+  await expect(button).toBeDisabled();
+  await expect(button).toHaveAttribute("aria-busy", "true");
+  await expect(button).toHaveText("Converting…");
+  await expect(page.getByLabel("Choose a style")).toBeDisabled();
+  await expect(
+    page.getByRole("button", { name: "Uninstall family…" }),
+  ).toBeDisabled();
+  expect(await calls(page, "export_woff2")).toHaveLength(1);
+  await page.evaluate(() => (window as any).__finishWoff2Export());
+  await expect(button).toBeEnabled();
+  await expect(page.getByLabel("Choose a style")).toBeEnabled();
+  await expect(page.locator(".toast")).toContainText(
+    "FontcatchQA-Regular.woff2 saved",
+  );
 });

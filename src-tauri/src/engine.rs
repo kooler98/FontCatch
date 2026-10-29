@@ -10,13 +10,20 @@ use crate::{
 use std::{
     collections::HashSet,
     path::{Path, PathBuf},
-    sync::mpsc::{self, Sender},
+    sync::{
+        atomic::{AtomicU8, Ordering},
+        mpsc::{self, Sender},
+        Arc,
+    },
     time::Duration,
 };
 use tauri::Emitter;
 use tauri_plugin_notification::NotificationExt;
 
 type Reply = Sender<Result<Snapshot, String>>;
+const WATCHER_STARTING: u8 = 0;
+const WATCHER_READY: u8 = 1;
+const WATCHER_FAILED: u8 = 2;
 pub enum Message {
     Snapshot(Reply),
     Configure(Settings, Reply),
@@ -33,8 +40,15 @@ pub enum Message {
     ),
 }
 #[derive(Clone)]
-pub struct EngineHandle(mpsc::SyncSender<Message>);
+pub struct EngineHandle(mpsc::SyncSender<Message>, Arc<AtomicU8>);
 impl EngineHandle {
+    pub fn ensure_watcher_ready(&self) -> Result<(), String> {
+        match self.1.load(Ordering::Acquire) {
+            WATCHER_STARTING => Err("engine_busy".into()),
+            WATCHER_READY => Ok(()),
+            _ => Err("engine_unavailable".into()),
+        }
+    }
     pub fn request<T>(
         &self,
         create: impl FnOnce(Sender<Result<T, String>>) -> Message,
@@ -721,26 +735,34 @@ pub fn start(
     data: PathBuf,
     settings: Settings,
 ) -> Result<EngineHandle, String> {
-    let mut engine = Engine::new(&data, settings.clone(), installer::native()?, Some(app))?;
+    let engine = Engine::new(&data, settings, installer::native()?, Some(app))?;
+    start_worker(engine, WatchService::new)
+}
+
+fn start_worker(
+    mut engine: Engine,
+    create_watcher: impl FnOnce(Vec<PathBuf>) -> Result<WatchService, String> + Send + 'static,
+) -> Result<EngineHandle, String> {
+    // Opening a watched folder can wait on an OS permission dialog or an unavailable
+    // volume. Baseline it once off the command worker, so existing library data and
+    // font previews remain available while that filesystem operation is pending.
+    let roots = engine.settings.folders.clone();
+    let (watcher_tx, watcher_rx) = mpsc::sync_channel(1);
+    std::thread::Builder::new()
+        .name("fontcatch-watcher-startup".into())
+        .spawn(move || {
+            let _ = watcher_tx.send(create_watcher(roots));
+        })
+        .map_err(|e| e.to_string())?;
     let (tx, rx) = mpsc::sync_channel(64);
+    let watcher_state = Arc::new(AtomicU8::new(WATCHER_STARTING));
+    let worker_watcher_state = watcher_state.clone();
     std::thread::Builder::new()
         .name("fontcatch-worker".into())
         .spawn(move || {
-            // Folder baselining is filesystem work; never block the macOS UI thread.
-            let mut watcher = match WatchService::new(settings.folders.clone()) {
-                Ok(watcher) => watcher,
-                Err(error) => {
-                    engine.watcher_errors.push(format!("watch_error:{error}"));
-                    engine.publish();
-                    return;
-                }
-            };
-            engine.watcher_errors = watcher.errors.clone();
-            if let Err(error) = engine.reconcile_pending() {
-                engine
-                    .watcher_errors
-                    .push(format!("processing_error:{error}"));
-            }
+            let mut watcher: Option<WatchService> = None;
+            let mut watcher_pending = true;
+            engine.watcher_errors = vec!["watcher_starting".into()];
             engine.publish();
             loop {
                 match rx.recv_timeout(Duration::from_millis(250)) {
@@ -748,10 +770,16 @@ pub fn start(
                         let _ = reply.send(engine.snapshot());
                     }
                     Ok(Message::Configure(settings, reply)) => {
-                        let result = watcher.configure(settings.folders.clone());
+                        // Do not let a later configuration race the initial baseline:
+                        // it must never turn pre-existing files into new downloads.
+                        let result = match watcher.as_mut() {
+                            Some(watcher) => watcher.configure(settings.folders.clone()),
+                            None if watcher_pending => Err("engine_busy".into()),
+                            None => Err("engine_unavailable".into()),
+                        };
                         let result = result.and_then(|_| engine.configure(settings));
                         if result.is_ok() {
-                            engine.watcher_errors = watcher.errors.clone();
+                            engine.watcher_errors = watcher.as_ref().unwrap().errors.clone();
                             engine.publish();
                         }
                         let _ = reply.send(result.and_then(|_| engine.snapshot()));
@@ -780,6 +808,38 @@ pub fn start(
                     Err(mpsc::RecvTimeoutError::Disconnected) => break,
                     Err(mpsc::RecvTimeoutError::Timeout) => {}
                 }
+                if watcher_pending {
+                    let result = match watcher_rx.try_recv() {
+                        Ok(result) => Some(result),
+                        Err(mpsc::TryRecvError::Empty) => None,
+                        Err(mpsc::TryRecvError::Disconnected) => {
+                            Some(Err("engine_unavailable".into()))
+                        }
+                    };
+                    if let Some(result) = result {
+                        watcher_pending = false;
+                        match result {
+                            Ok(service) => {
+                                engine.watcher_errors = service.errors.clone();
+                                watcher = Some(service);
+                                if let Err(error) = engine.reconcile_pending() {
+                                    engine
+                                        .watcher_errors
+                                        .push(format!("processing_error:{error}"));
+                                }
+                                worker_watcher_state.store(WATCHER_READY, Ordering::Release);
+                            }
+                            Err(error) => {
+                                engine.watcher_errors = vec![format!("watch_error:{error}")];
+                                worker_watcher_state.store(WATCHER_FAILED, Ordering::Release);
+                            }
+                        }
+                        engine.publish();
+                    }
+                }
+                let Some(watcher) = watcher.as_mut() else {
+                    continue;
+                };
                 let ready = watcher.poll();
                 if watcher.errors != engine.watcher_errors {
                     engine.watcher_errors = watcher.errors.clone();
@@ -806,7 +866,7 @@ pub fn start(
             }
         })
         .map_err(|e| e.to_string())?;
-    Ok(EngineHandle(tx))
+    Ok(EngineHandle(tx, watcher_state))
 }
 #[cfg(test)]
 mod tests {
@@ -832,6 +892,111 @@ mod tests {
             None,
         )
         .unwrap()
+    }
+    fn request_before_deadline<T>(
+        handle: &EngineHandle,
+        create: impl FnOnce(Sender<Result<T, String>>) -> Message,
+    ) -> Result<T, String> {
+        let (tx, rx) = mpsc::channel();
+        handle.0.send(create(tx)).unwrap();
+        rx.recv_timeout(Duration::from_secs(2))
+            .expect("the command worker must not wait for the folder baseline")
+    }
+    #[test]
+    fn blocked_folder_baseline_keeps_library_available_and_defers_configuration() {
+        let root = tempfile::tempdir().unwrap();
+        let downloads = root.path().join("downloads");
+        std::fs::create_dir(&downloads).unwrap();
+        let old = downloads.join("old.ttf");
+        std::fs::copy(fixture("FontcatchQA-Variable.ttf"), &old).unwrap();
+        let pending = root.path().join("pending.ttf");
+        std::fs::copy(fixture("FontcatchQA-Regular.ttf"), &pending).unwrap();
+        let mut engine = engine(root.path(), Mode::Ask);
+        let id = engine.ingest(&pending).unwrap().unwrap();
+        engine.settings.folders = vec![downloads];
+        let settings = engine.settings.clone();
+        let (release, gate) = mpsc::sync_channel(1);
+        let handle = start_worker(engine, move |roots| {
+            // Simulate a folder open held by an OS permission prompt. A timeout
+            // also releases the thread if an assertion fails before the test gate.
+            gate.recv_timeout(Duration::from_secs(5)).unwrap();
+            WatchService::new(roots)
+        })
+        .unwrap();
+        assert_eq!(handle.ensure_watcher_ready(), Err("engine_busy".into()));
+        let snapshot = request_before_deadline(&handle, Message::Snapshot).unwrap();
+        assert_eq!(snapshot.recent.len(), 1);
+        assert_eq!(snapshot.recent[0].id, id);
+        assert!(snapshot.installed.is_empty());
+        assert_eq!(snapshot.watcher_errors, ["watcher_starting"]);
+        let auto = Settings {
+            mode: Mode::Auto,
+            ..settings.clone()
+        };
+        assert!(matches!(
+            request_before_deadline(&handle, |tx| Message::Configure(auto, tx)),
+            Err(error) if error == "engine_busy"
+        ));
+        assert!(request_before_deadline(&handle, |tx| {
+            Message::Font("not-installed".into(), tx)
+        })
+        .is_err());
+        release.send(()).unwrap();
+        let deadline = std::time::Instant::now() + Duration::from_secs(5);
+        while handle.ensure_watcher_ready().is_err() {
+            assert!(std::time::Instant::now() < deadline);
+            request_before_deadline(&handle, Message::Snapshot).unwrap();
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        // Poll beyond the stability gate: the existing download stays baseline-only,
+        // and the rejected automatic setting has not installed the pending font.
+        let until = std::time::Instant::now() + Duration::from_millis(1200);
+        loop {
+            let snapshot = request_before_deadline(&handle, Message::Snapshot).unwrap();
+            assert_eq!(snapshot.recent.len(), 1);
+            assert_eq!(snapshot.recent[0].status, "pending");
+            assert!(snapshot.installed.is_empty());
+            assert!(!snapshot
+                .watcher_errors
+                .iter()
+                .any(|error| error == "watcher_starting"));
+            assert!(old.exists());
+            if std::time::Instant::now() >= until {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        request_before_deadline(&handle, |tx| Message::Configure(settings, tx)).unwrap();
+    }
+    #[test]
+    fn failed_folder_baseline_keeps_library_commands_available() {
+        let root = tempfile::tempdir().unwrap();
+        let engine = engine(root.path(), Mode::Ask);
+        let settings = engine.settings.clone();
+        let handle = start_worker(engine, |_| Err("test_watch_failure".into())).unwrap();
+        let deadline = std::time::Instant::now() + Duration::from_secs(2);
+        loop {
+            let snapshot = request_before_deadline(&handle, Message::Snapshot).unwrap();
+            if snapshot
+                .watcher_errors
+                .iter()
+                .any(|e| e.starts_with("watch_error:"))
+            {
+                assert_eq!(snapshot.watcher_errors, ["watch_error:test_watch_failure"]);
+                break;
+            }
+            assert!(std::time::Instant::now() < deadline);
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert_eq!(
+            handle.ensure_watcher_ready(),
+            Err("engine_unavailable".into())
+        );
+        assert!(matches!(
+            request_before_deadline(&handle, |tx| Message::Configure(settings, tx)),
+            Err(error) if error == "engine_unavailable"
+        ));
+        request_before_deadline(&handle, Message::Snapshot).unwrap();
     }
     #[test]
     fn pending_survives_restart_and_original_deletion_then_installs() {

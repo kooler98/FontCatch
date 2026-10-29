@@ -16,6 +16,10 @@ test("demo approval, library filters, preview and empty state", async ({
   ).toHaveCount(0);
   await expect(page.locator(".task-row")).toHaveCount(4);
   await page.getByRole("tab", { name: "Library" }).click();
+  await expect(
+    page.getByRole("button", { name: "Convert file…" }),
+  ).toBeDisabled();
+  await expect(page.getByText("Available in the desktop app")).toBeVisible();
   await expect(page.locator(".library-card")).toHaveCount(4);
   await page
     .getByRole("textbox", { name: "Name, foundry or source…" })

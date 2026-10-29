@@ -20,6 +20,7 @@
     "allow-install-font",
     "allow-ignore-font",
     "allow-read-font-preview",
+    "allow-export-woff2",
     "allow-reveal-font",
     "allow-open-font-license",
     "allow-plan-uninstall",

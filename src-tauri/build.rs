@@ -7,6 +7,7 @@ fn main() {
             "install_font",
             "ignore_font",
             "read_font_preview",
+            "export_woff2",
             "reveal_font",
             "open_font_license",
             "plan_uninstall",

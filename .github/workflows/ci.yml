@@ -219,6 +219,10 @@ jobs:
 
           Download the `.exe` installer and open Fontcatch from the Start menu. Installation is configured for the current user. The installer downloads WebView2 if it is missing.
 
+          This preview adds WOFF2 export for the selected library style, including a selected face from a TTC collection. Use **Convert file…** to convert an external TTF or OTF without installing it or adding it to the library.
+
+          Conversion runs locally, with native file selection and Save dialogs, a 32 MiB input limit and one conversion at a time. Original files stay unchanged, and existing destination files are never overwritten. Embedded license metadata is retained; check that the font's license allows conversion and web use. WOFF2 remains an export format, not an installation input.
+
           [Verified CI run]({run_url}) built this installer from commit `{os.environ['GITHUB_SHA']}` after frontend, macOS and Windows checks passed. Windows checks cover Rust tests, native font registration and removal, and app startup with database initialization.
 
           This installer is unsigned. Windows may warn about or block it. CI runs on Windows Server 2022 x64 with an administrator account; manual Windows 10/11 checks remain pending, including tray behavior, display scaling and installation with a standard user account. The installer itself has not been exercised interactively.
