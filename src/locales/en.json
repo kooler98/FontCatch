@@ -160,6 +160,7 @@
   "invalid_data_directory": "The data directory cannot be used.",
   "font_registration_failed": "Windows could not load this font.",
   "font_unregistration_failed": "Windows could not unload this font. Close applications using it and try again.",
+  "font_trash_failed": "The font could not be moved to the Recycle Bin. Close applications using it and try again.",
   "exportWoff2": "Export WOFF2",
   "convertFile": "Convert file…",
   "convertingWoff2": "Converting…",

@@ -25,6 +25,9 @@ pub trait Platform: Send {
     fn trash(&self, path: &Path) -> Result<(), String> {
         trash::delete(path).map_err(|e| e.to_string())
     }
+    fn trash_owned(&self, path: &Path, _hash: &str) -> Result<(), String> {
+        self.trash(path)
+    }
 }
 pub fn native() -> Result<Box<dyn Platform>, String> {
     #[cfg(target_os = "macos")]
@@ -73,30 +76,71 @@ pub fn remove_owned(
     hash: &str,
     faces: &[FontFace],
 ) -> Result<(), String> {
-    let metadata = match fs::symlink_metadata(path) {
-        Ok(metadata) => metadata,
+    match fs::symlink_metadata(path) {
+        Ok(_) => {}
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
         Err(e) => return Err(e.to_string()),
-    };
-    if !metadata.is_file() {
-        return Err("installed_font_changed".into());
     }
+    verify_owned(platform, path, hash)?;
+    platform.unregister(path, faces)?;
+    let removal = platform
+        .trash_owned(path, hash)
+        .and_then(|_| match fs::symlink_metadata(path) {
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(error) => Err(error.to_string()),
+            Ok(_) => Err("font_trash_failed".into()),
+        });
+    if let Err(error) = removal {
+        // A failed Shell operation can outlive the user's edit or replacement.
+        // Restore registration only for the exact file we originally removed.
+        verify_owned(platform, path, hash)?;
+        let _ = platform.register(path, faces);
+        return Err(error);
+    }
+    Ok(())
+}
+
+fn verify_owned(platform: &dyn Platform, path: &Path, hash: &str) -> Result<(), String> {
     if path.parent() != Some(platform.root())
         || !path
             .file_name()
             .unwrap_or_default()
             .to_string_lossy()
             .starts_with("Fontcatch-")
-        || hash_file(path, MAX_FILE)? != hash
+        // hash_file opens a regular file and rejects final symlinks/reparse points.
+        || !hash_file(path, MAX_FILE).is_ok_and(|actual| actual == hash)
     {
         return Err("installed_font_changed".into());
     }
-    platform.unregister(path, faces)?;
-    if let Err(error) = platform.trash(path) {
-        let _ = platform.register(path, faces);
-        return Err(error);
-    }
     Ok(())
+}
+
+#[cfg(any(target_os = "windows", test))]
+enum OwnedTrashError {
+    Retry(String),
+    Stop(String),
+}
+
+#[cfg(any(target_os = "windows", test))]
+fn retry_owned_trash(
+    mut validate: impl FnMut() -> Result<(), String>,
+    mut remove: impl FnMut() -> Result<(), OwnedTrashError>,
+    mut wait: impl FnMut(std::time::Duration),
+) -> Result<(), String> {
+    // Allow transient Shell/font-cache locks to settle, but never loop indefinitely
+    // or bypass the Recycle Bin. Each retry gets a fresh ownership/hash check.
+    let mut delays = [100, 200, 400, 800, 1600].into_iter();
+    loop {
+        validate()?;
+        match remove() {
+            Ok(()) => return Ok(()),
+            Err(OwnedTrashError::Stop(error)) => return Err(error),
+            Err(OwnedTrashError::Retry(error)) => match delays.next() {
+                Some(delay) => wait(std::time::Duration::from_millis(delay)),
+                None => return Err(error),
+            },
+        }
+    }
 }
 #[derive(Debug, Default)]
 pub struct Plan {
@@ -252,6 +296,7 @@ pub mod test_platform {
 mod tests {
     use super::*;
     use crate::model::now;
+    use std::cell::Cell;
     fn fixture() -> FontFile {
         inspector::inspect(
             Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -354,5 +399,157 @@ mod tests {
         fs::write(&dest, b"user-modified").unwrap();
         assert!(remove_owned(&p, &dest, &f.hash, &f.faces).is_err());
         assert!(dest.exists());
+    }
+    #[test]
+    fn owned_trash_retries_are_bounded_and_return_the_last_error() {
+        let mut checks = 0;
+        let mut attempts = 0;
+        let mut delays = Vec::new();
+        let result = retry_owned_trash(
+            || {
+                checks += 1;
+                Ok(())
+            },
+            || {
+                attempts += 1;
+                Err(OwnedTrashError::Retry(format!("locked-{attempts}")))
+            },
+            |delay| delays.push(delay.as_millis()),
+        );
+        assert_eq!(result, Err("locked-6".into()));
+        assert_eq!(checks, 6);
+        assert_eq!(attempts, 6);
+        assert_eq!(delays, [100, 200, 400, 800, 1600]);
+    }
+    #[test]
+    fn owned_trash_stops_on_success_or_permanent_failure() {
+        for succeed in [false, true] {
+            let mut attempts = 0;
+            let mut waits = 0;
+            let result = retry_owned_trash(
+                || Ok(()),
+                || {
+                    attempts += 1;
+                    if attempts == 1 {
+                        Err(OwnedTrashError::Retry("temporarily locked".into()))
+                    } else if succeed {
+                        Ok(())
+                    } else {
+                        Err(OwnedTrashError::Stop("recycling unavailable".into()))
+                    }
+                },
+                |_| waits += 1,
+            );
+            assert_eq!(attempts, 2);
+            assert_eq!(waits, 1);
+            assert_eq!(
+                result,
+                if succeed {
+                    Ok(())
+                } else {
+                    Err("recycling unavailable".into())
+                }
+            );
+        }
+    }
+    #[test]
+    fn owned_trash_rechecks_the_hash_before_retrying() {
+        let root = tempfile::tempdir().unwrap();
+        let platform = test_platform::Sandbox {
+            root: root.path().into(),
+            fail_register: false,
+        };
+        let font = fixture();
+        let path = install(&platform, &font).unwrap();
+        let mut attempts = 0;
+        let result = retry_owned_trash(
+            || verify_owned(&platform, &path, &font.hash),
+            || {
+                attempts += 1;
+                fs::write(&path, b"user replacement").unwrap();
+                Err(OwnedTrashError::Retry("temporarily locked".into()))
+            },
+            |_| {},
+        );
+        assert_eq!(result, Err("installed_font_changed".into()));
+        assert_eq!(attempts, 1);
+        assert_eq!(fs::read(path).unwrap(), b"user replacement");
+    }
+    struct FailedTrash {
+        root: PathBuf,
+        registrations: Cell<usize>,
+        replace: bool,
+        report_success: bool,
+    }
+    impl Platform for FailedTrash {
+        fn root(&self) -> &Path {
+            &self.root
+        }
+        fn register(&self, _: &Path, _: &[FontFace]) -> Result<(), String> {
+            self.registrations.set(self.registrations.get() + 1);
+            Ok(())
+        }
+        fn unregister(&self, _: &Path, _: &[FontFace]) -> Result<(), String> {
+            Ok(())
+        }
+        fn refresh(&self) -> Result<(), String> {
+            Ok(())
+        }
+        fn search_roots(&self) -> Vec<PathBuf> {
+            vec![]
+        }
+        fn trash(&self, path: &Path) -> Result<(), String> {
+            if self.replace {
+                fs::write(path, b"user replacement").unwrap();
+            }
+            if self.report_success {
+                Ok(())
+            } else {
+                Err("recycling unavailable".into())
+            }
+        }
+    }
+    #[test]
+    fn failed_owned_trash_restores_only_the_unchanged_font() {
+        for replace in [false, true] {
+            let root = tempfile::tempdir().unwrap();
+            let platform = FailedTrash {
+                root: root.path().into(),
+                registrations: Cell::new(0),
+                replace,
+                report_success: false,
+            };
+            let font = fixture();
+            let path = install(&platform, &font).unwrap();
+            let error = remove_owned(&platform, &path, &font.hash, &font.faces).unwrap_err();
+            assert!(path.exists());
+            if replace {
+                assert_eq!(error, "installed_font_changed");
+                assert_eq!(platform.registrations.get(), 1);
+                assert_eq!(fs::read(path).unwrap(), b"user replacement");
+            } else {
+                assert_eq!(error, "recycling unavailable");
+                assert_eq!(platform.registrations.get(), 2);
+                assert_eq!(hash_file(&path, MAX_FILE).unwrap(), font.hash);
+            }
+        }
+    }
+    #[test]
+    fn a_reported_trash_success_must_actually_remove_the_font() {
+        let root = tempfile::tempdir().unwrap();
+        let platform = FailedTrash {
+            root: root.path().into(),
+            registrations: Cell::new(0),
+            replace: false,
+            report_success: true,
+        };
+        let font = fixture();
+        let path = install(&platform, &font).unwrap();
+        assert_eq!(
+            remove_owned(&platform, &path, &font.hash, &font.faces),
+            Err("font_trash_failed".into())
+        );
+        assert_eq!(platform.registrations.get(), 2);
+        assert_eq!(hash_file(&path, MAX_FILE).unwrap(), font.hash);
     }
 }

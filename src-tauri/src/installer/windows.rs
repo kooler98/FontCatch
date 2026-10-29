@@ -141,7 +141,9 @@ impl Platform for WindowsInstaller {
             written.push(name);
         }
         loaded.insert(path.to_path_buf());
-        Ok(())
+        drop(loaded);
+        // This also announces restoration after a failed attempt to recycle a font.
+        self.refresh()
     }
     fn unregister(&self, path: &Path, faces: &[FontFace]) -> Result<(), String> {
         let encoded = self.owned_path(path)?;
@@ -163,7 +165,9 @@ impl Platform for WindowsInstaller {
         // the file. Zero also covers a resource already absent during recovery.
         for _ in 0..256 {
             if unsafe { RemoveFontResourceW(encoded.as_ptr()) } == 0 {
-                return Ok(());
+                // Notify consumers before recycling, so they can release cached
+                // references instead of learning about removal only afterward.
+                return self.refresh();
             }
         }
         Err("font_unregistration_failed".into())
@@ -173,6 +177,33 @@ impl Platform for WindowsInstaller {
         // per top-level window when another app is slow or not responding.
         unsafe { SendNotifyMessageW(HWND_BROADCAST, WM_FONTCHANGE, 0, 0) };
         Ok(())
+    }
+    fn trash_owned(&self, path: &Path, hash: &str) -> Result<(), String> {
+        self.owned_path(path)?;
+        retry_owned_trash(
+            || verify_owned(self, path, hash),
+            || {
+                trash::delete(path).map_err(|error| {
+                    // With FOF_NOERRORUI, Shell can report a transient sharing
+                    // failure only through this generic aborted-operation result.
+                    let retryable = match &error {
+                        trash::Error::Unknown { description } => {
+                            description == "Some operations were aborted"
+                        }
+                        trash::Error::Os { code, .. } => {
+                            matches!(*code as u32, 0x80070020 | 0x80070021)
+                        }
+                        _ => false,
+                    };
+                    if retryable {
+                        OwnedTrashError::Retry(error.to_string())
+                    } else {
+                        OwnedTrashError::Stop(error.to_string())
+                    }
+                })
+            },
+            std::thread::sleep,
+        )
     }
     fn search_roots(&self) -> Vec<PathBuf> {
         let mut roots = vec![self.root.clone()];
@@ -188,7 +219,7 @@ mod tests {
     use super::*;
     use std::{ffi::OsString, os::windows::ffi::OsStringExt};
     use windows_sys::Win32::Graphics::Gdi::{
-        CreateCompatibleDC, CreateFontIndirectW, DeleteDC, DeleteObject, GetTextFaceW,
+        CreateCompatibleDC, CreateFontIndirectW, DeleteDC, DeleteObject, GdiFlush, GetTextFaceW,
         SelectObject, DEFAULT_CHARSET, LOGFONTW,
     };
 
@@ -301,11 +332,17 @@ mod tests {
                 panic!("GDI could not create the test font");
             }
             let previous = SelectObject(dc, font);
+            assert!(!previous.is_null());
             let mut name = [0u16; 64];
             let result = GetTextFaceW(dc, name.len() as i32, name.as_mut_ptr());
-            SelectObject(dc, previous);
-            DeleteObject(font);
-            DeleteDC(dc);
+            let restored = SelectObject(dc, previous);
+            let font_deleted = DeleteObject(font);
+            let dc_deleted = DeleteDC(dc);
+            let flushed = GdiFlush();
+            assert_eq!(restored, font, "GDI must release the selected test font");
+            assert_ne!(font_deleted, 0, "GDI test font must be destroyed");
+            assert_ne!(dc_deleted, 0, "GDI test context must be destroyed");
+            assert_ne!(flushed, 0, "GDI cleanup must finish before font removal");
             assert!(result > 0);
             let length = name.iter().position(|c| *c == 0).unwrap_or(name.len());
             String::from_utf16(&name[..length]).unwrap()

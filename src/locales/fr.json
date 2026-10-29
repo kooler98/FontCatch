@@ -160,6 +160,7 @@
   "invalid_data_directory": "Le dossier de données ne peut pas être utilisé.",
   "font_registration_failed": "Windows n’a pas pu charger cette police.",
   "font_unregistration_failed": "Windows n’a pas pu décharger cette police. Ferme les applications qui l’utilisent, puis réessaie.",
+  "font_trash_failed": "La police n’a pas pu être déplacée vers la Corbeille. Ferme les applications qui l’utilisent, puis réessaie.",
   "exportWoff2": "Exporter en WOFF2",
   "convertFile": "Convertir un fichier…",
   "convertingWoff2": "Conversion…",
