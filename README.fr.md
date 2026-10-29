@@ -34,7 +34,7 @@ Les ZIP pris en charge sont les archives ZIP32 classiques, sans compression ou a
 | **Installer depuis un ZIP** | Repérer et installer les polices de bureau sans extraire manuellement l’archive. Les ZIP sans rapport sont ignorés. |
 | **Choisir les bonnes versions** | Privilégier les polices variables, statiques ou les deux lorsqu’une famille propose plusieurs alternatives. Les doublons de noms PostScript sont vérifiés avant installation. |
 | **Essayer la vraie typo** | Afficher la police installée, changer de style, saisir ton texte et ajuster la taille. |
-| **Exporter une police web · sources 0.4.0** | Enregistrer le style sélectionné en WOFF2 ou convertir un TTF/OTF local sans l’installer. |
+| **Exporter une police web** | Enregistrer le style sélectionné en WOFF2 ou convertir un TTF/OTF local sans l’installer. |
 | **Retrouver une police** | Chercher dans la bibliothèque Fontcatch par famille, fonderie ou source ; filtrer par type et par provenance lorsqu’elle est disponible. |
 | **Consulter les informations utiles** | Retrouver les styles, versions, sources et licences intégrées, ou afficher directement le fichier installé. |
 | **Retirer une famille** | Vérifier les fichiers concernés, puis déplacer les polices gérées vers la Corbeille. Une collection TTC partagée indique toutes les familles affectées. |
@@ -46,7 +46,7 @@ La bibliothèque contient les polices installées avec Fontcatch. Elle ne recens
 
 ### Exporter en WOFF2
 
-Disponible dans la **version 0.4.0 construite depuis les sources** ; la version de test Windows 0.3.5 publiée ne contient pas cette fonction.
+Disponible dans la **version de test Windows 0.4.0** et les builds construits depuis les sources.
 
 - **Depuis la bibliothèque :** sélectionne un style, puis **Exporter en WOFF2**. Pour une collection TTC, seule la face sélectionnée est exportée.
 - **Depuis un fichier :** choisis **Convertir un fichier…**, puis un `.ttf` ou `.otf`. La police est convertie sans être installée ni ajoutée à la bibliothèque.
@@ -69,9 +69,9 @@ Le [compte rendu de sécurité et de performance](docs/security-and-performance.
 
 ## Commencer
 
-**Sources actuelles : 0.4.0 alpha. Dernière version de test publiée : 0.3.5.**
+**Version actuelle : 0.4.0 alpha.**
 
-**[Télécharger Fontcatch pour Windows x64](https://github.com/kooler98/FontCatch/releases/download/v0.3.5/Fontcatch_0.3.5_x64-setup.exe)** · [Notes de version et empreintes SHA-256](https://github.com/kooler98/FontCatch/releases/tag/v0.3.5)
+**[Télécharger Fontcatch pour Windows x64](https://github.com/kooler98/FontCatch/releases/download/v0.4.0/Fontcatch_0.4.0_x64-setup.exe)** · [Notes de version et empreintes SHA-256](https://github.com/kooler98/FontCatch/releases/tag/v0.4.0)
 
 Pour **Windows 10/11 · x64**, télécharge l’installeur `.exe` ci-dessus, lance-le, puis ouvre Fontcatch depuis le menu Démarrer. L’installation concerne ton compte ; si WebView2 manque, l’installeur le télécharge.
 
@@ -81,12 +81,12 @@ Laisse Fontcatch ouvert et télécharge une nouvelle police. Son icône dans la 
 
 L’installeur de test Windows n’est pas signé. Les builds macOS n’ont ni signature de distribution ni notarisation. Ton système peut afficher un avertissement ou bloquer leur ouverture.
 
-Les validations sont indiquées par plateforme et par version. Le téléchargement Windows publié reste en 0.3.5 ; la validation Windows 0.4.0 est en attente.
+La version de test Windows 0.4.0 a passé les vérifications automatisées. Les tests manuels de l’interface sous Windows 10/11 restent à faire.
 
 | Plateforme | Validation effectuée |
 | --- | --- |
-| macOS · Apple Silicon | Version 0.4.0 construite et testée localement : export WOFF2 d’un style installé et d’un fichier externe via les fenêtres natives, décodage indépendant, originaux conservés et annulation de l’enregistrement. La bibliothèque reste utilisable pendant l’attente d’accès initial au dossier. La détection de nouveaux téléchargements dans le vrai dossier surveillé reste non vérifiée en 0.4.0 ; les anciens tests d’installation, d’aperçu et de retrait concernent la 0.3.4. |
-| Windows 10/11 · x64 visé | Version 0.3.5 : [Vérifications Windows réussies](https://github.com/kooler98/FontCatch/actions/runs/40540707057) : 84 tests Rust, installation et retrait natifs de polices, création de l’installeur NSIS et démarrage de l’app. La validation manuelle de l’interface reste à faire. |
+| macOS · Apple Silicon | Build local 0.4.0 testé avant le correctif de retrait Windows : export WOFF2 d’un style installé et d’un fichier externe via les fenêtres natives, décodage indépendant, originaux conservés et annulation de l’enregistrement. La bibliothèque est restée utilisable pendant l’attente d’accès initial au dossier ; après autorisation macOS, l’avertissement a disparu et la surveillance a démarré. Aucun nouveau téléchargement réel n’a encore été testé en 0.4.0 ; les anciens tests d’installation, d’aperçu et de retrait concernent la 0.3.4. |
+| Windows 10/11 · x64 visé | Version 0.4.0 : [Vérifications Windows réussies](https://github.com/kooler98/FontCatch/actions/runs/40904840143) : 99 tests Rust, un test natif d’installation et de retrait de police, création de l’installeur NSIS et démarrage de l’app. La validation manuelle de l’interface reste à faire. |
 | macOS · Intel | Pas encore testé ; aucune version Intel à télécharger. |
 | Linux | Expérimental. Fonctionnement natif non validé ; une alerte connue sur une dépendance GTK/glib doit être résolue avant distribution. |
 

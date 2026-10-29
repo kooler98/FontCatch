@@ -8,18 +8,30 @@ WOFF2 conversion runs locally in Rust, with a 32 MiB input limit and one convers
 
 Verified on the local macOS build:
 
-- **94 Rust tests passed**; 3 opt-in tests remained ignored: two QA helpers and the macOS installation smoke test. Formatting and Clippy for all local targets passed with warnings treated as errors.
+- **99 Rust tests passed locally**; 3 opt-in tests remained ignored: two QA helpers and the macOS installation smoke test. Formatting and Clippy for all local targets passed with warnings treated as errors.
 - **8 TypeScript tests and 18 browser interaction tests passed**, along with the production frontend build.
 - Independent FontTools decoding and Chrome `FontFace` loading succeeded for four generated outputs: static TrueType, variable TrueType, CFF OpenType and a selected TTC face.
 - Audits on 29 October reported zero npm vulnerabilities and zero entries in Cargo's vulnerability list. The same five RustSec warnings listed below remain unresolved.
 
-The final regular application bundle contains **17,889,093 bytes (17.06 MiB)**. Its ZIP contains **4,990,684 bytes** and passed archive CRC verification. A 32 MiB incompressible stress input took **2.25 seconds in a debug build**, with **210.6 MiB peak process RSS** during conversion. This temporary peak is a measured test result, not idle memory use or a guaranteed memory ceiling for every font.
+The local macOS 0.4.0 application bundle, built before the Windows removal-retry fix, contains **17,889,093 bytes (17.06 MiB)**. Its ZIP contains **4,990,684 bytes** and passed archive CRC verification. That bundle was not rebuilt after the Windows fix. A 32 MiB incompressible stress input took **2.25 seconds in a debug build**, with **210.6 MiB peak process RSS** during conversion. This temporary peak is a measured test result, not idle memory use or a guaranteed memory ceiling for every font.
 
-Native QA on the final regular 0.4.0 Apple Silicon app verified both WOFF2 paths: a selected external CFF OTF passed through native Open and Save dialogs to a 552-byte output, and a selected installed library style produced a 15,236-byte output. FontTools independently decoded both outputs; the external source hash was unchanged. Cancelling Save produced no error and unlocked the controls.
+Native QA on that 0.4.0 Apple Silicon bundle verified both WOFF2 paths: a selected external CFF OTF passed through native Open and Save dialogs to a 552-byte output, and a selected installed library style produced a 15,236-byte output. FontTools independently decoded both outputs; the external source hash was unchanged. Cancelling Save produced no error and unlocked the controls.
 
-Startup now creates the library and command worker independently of the initial watched-folder scan. Native QA confirmed that the library remains usable and WOFF2 export works while that initial filesystem read is blocked. The selected Downloads folder read was still pending on this Mac, and macOS displayed a folder-access permission prompt. Approval and resumed detection have not yet been verified. New-download detection in that real folder was therefore **not validated on 0.4.0**. Live filesystem-event tests passed in temporary folders. Later fallback scans and folder reconfiguration can still wait on filesystem access; this change isolates the initial scan rather than removing every possible filesystem wait.
+Startup now creates the library and command worker independently of the initial watched-folder scan. Native QA confirmed that the library remains usable and WOFF2 export works while that initial filesystem read is blocked. macOS displayed a folder-access permission prompt. After the user accepted it, the Recent warning cleared and the watcher started. A new real download has not yet been tested, so end-to-end new-download detection in that folder remains **unverified on 0.4.0**. Live filesystem-event tests passed in temporary folders. Later fallback scans and folder reconfiguration can still wait on filesystem access; this change isolates the initial scan rather than removing every possible filesystem wait.
 
-No Windows CI run has yet validated 0.4.0; the passing Windows results below apply to 0.3.5.
+Windows owned-font removal uses bounded retries for transient Recycle Bin failures. Ownership and the file hash are rechecked before every attempt. Exhausted or unsafe attempts return an error; there is no permanent-deletion fallback. Five additional local tests cover retry bounds, changed files and failed-removal recovery.
+
+### Windows 0.4.0 preview
+
+The [0.4.0 release CI run](https://github.com/kooler98/FontCatch/actions/runs/40904840143) passed at commit `2cd11f5c28384b145b6c266907a27de14fb98631`. The [Windows preview](https://github.com/kooler98/FontCatch/releases/tag/v0.4.0) was published on 29 October 2026 with the x64 installer and `SHA256SUMS.txt`.
+
+- Windows: **99 Rust tests passed, 3 ignored**, followed by **1 passing native font-installation/removal smoke test**. These checks include WOFF2 encoding and bounded removal-retry coverage.
+- macOS CI: **99 Rust tests passed, 3 ignored**, with formatting and Clippy checks passing.
+- Frontend: **8 TypeScript tests, 18 browser interaction tests and 3 native-launcher tests passed**; the production build passed and npm reported zero vulnerabilities.
+- Built the unsigned NSIS installer: **3,145,797 bytes (3.00 MiB)**. The packaged application initialized its database after 10.2 seconds and remained running for a further 10 seconds.
+- After publication, the public installer and checksum file were independently downloaded. The installer had a Windows `MZ` header; its computed SHA-256 matched both the published checksum and GitHub's asset digest: `c882f61a03ccad54c76803eb78f44387cf09cf10c9ce195ed27b1c349459f06d`.
+
+The installer is unsigned. The Windows checks ran on Windows Server 2022 x64 with an administrator account. They do not validate interactive Open/Save dialogs or WOFF2 export through the Windows interface, a standard user account, the installer wizard, tray positioning, display scaling or reboot persistence. Manual Windows 10/11 desktop checks remain pending. Native WOFF2 dialog checks described above were performed on macOS.
 
 ## Historical review — 0.3.5 Windows preview, 27 October 2026
 

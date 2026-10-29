@@ -34,7 +34,7 @@ ZIP support covers standard ZIP32 archives using Store or Deflate compression, w
 | **Install from a ZIP** | Find and install the desktop fonts without manually extracting the archive. Unrelated ZIPs are ignored. |
 | **Choose the versions you want** | Prefer variable fonts, static fonts, or both when a family offers alternatives. Duplicate PostScript names are checked before installation. |
 | **Try the actual typeface** | Preview the installed font, change styles, type your own text and adjust the size. |
-| **Export a web font · 0.4.0 source** | Save the selected library style as WOFF2, or convert a local TTF/OTF without installing it. |
+| **Export a web font** | Save the selected library style as WOFF2, or convert a local TTF/OTF without installing it. |
 | **Find a font again** | Search the Fontcatch library by family, foundry or source; filter by type and download source when available. |
 | **Keep useful details nearby** | Inspect styles, version information, source details and embedded license text or links. Reveal the installed file when you need it. |
 | **Remove a family** | Review the files affected, then move the managed font files to Trash. Shared TTC collections list all affected families. |
@@ -46,7 +46,7 @@ The library contains fonts installed through Fontcatch. It is not a catalog of e
 
 ### Export WOFF2
 
-Available in the **0.4.0 source build**; the published 0.3.5 Windows preview does not include this feature.
+Available in the **0.4.0 Windows preview** and source builds.
 
 - **From the library:** select a style, then choose **Export WOFF2**. For a TTC collection, only the selected face is exported.
 - **From a file:** choose **Convert file…** and select a `.ttf` or `.otf`. The font is converted without being installed or added to the library.
@@ -69,9 +69,9 @@ See the [security and performance review](docs/security-and-performance.md) for 
 
 ## Get started
 
-**Current source: 0.4.0 alpha. Latest published preview: 0.3.5.**
+**Current version: 0.4.0 alpha.**
 
-**[Download Fontcatch for Windows x64](https://github.com/kooler98/FontCatch/releases/download/v0.3.5/Fontcatch_0.3.5_x64-setup.exe)** · [Release notes and SHA-256 checksums](https://github.com/kooler98/FontCatch/releases/tag/v0.3.5)
+**[Download Fontcatch for Windows x64](https://github.com/kooler98/FontCatch/releases/download/v0.4.0/Fontcatch_0.4.0_x64-setup.exe)** · [Release notes and SHA-256 checksums](https://github.com/kooler98/FontCatch/releases/tag/v0.4.0)
 
 For **Windows 10/11 · x64**, download the `.exe` installer above, run it, then open Fontcatch from the Start menu. It installs for your account; if WebView2 is missing, the installer downloads it.
 
@@ -81,12 +81,12 @@ Keep Fontcatch running and download a new font. Use its icon in the menu bar or 
 
 The Windows preview installer is unsigned. macOS builds do not have distribution signing or notarization. Your operating system may warn about or block these builds.
 
-Validation is recorded per platform and version. The published Windows download remains 0.3.5; Windows 0.4.0 validation is pending.
+The Windows 0.4.0 preview passed automated checks. Manual Windows 10/11 desktop testing remains pending.
 
 | Platform | Recorded validation |
 | --- | --- |
-| macOS · Apple Silicon | 0.4.0 built and tested locally: library-style and external-file WOFF2 export through native dialogs, independently decoded outputs, unchanged originals and Save cancellation. The library stays usable while initial folder access is pending. New-download detection in the real watched folder remains unverified on 0.4.0; earlier installation/preview/removal checks apply to 0.3.4. |
-| Windows 10/11 · x64 target | 0.3.5: [Windows CI passed](https://github.com/kooler98/FontCatch/actions/runs/40540707057): 84 Rust tests, native font installation/removal, NSIS packaging and app startup checks. Manual desktop validation is still pending. |
+| macOS · Apple Silicon | Local 0.4.0 bundle tested before the Windows removal-retry fix: library-style and external-file WOFF2 export through native dialogs, independently decoded outputs, unchanged originals and Save cancellation. The library stayed usable while initial folder access was pending; after macOS access was granted, the warning cleared and the watcher started. A new real download has not yet been tested on 0.4.0; earlier installation/preview/removal checks apply to 0.3.4. |
+| Windows 10/11 · x64 target | 0.4.0: [Windows CI passed](https://github.com/kooler98/FontCatch/actions/runs/40904840143): 99 Rust tests, a native font installation/removal smoke test, NSIS packaging and app startup checks. Manual desktop validation is still pending. |
 | macOS · Intel | Not yet tested; no Intel preview build. |
 | Linux | Experimental. Native behavior is unvalidated and a known GTK/glib dependency warning must be resolved before distribution. |
 
