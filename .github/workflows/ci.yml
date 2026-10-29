@@ -117,6 +117,8 @@ jobs:
         run: npm run desktop:build -- --ci --no-sign --target x86_64-pc-windows-msvc --bundles nsis -- --locked
       - name: Check packaged app startup
         shell: pwsh
+        env:
+          RUST_BACKTRACE: "1"
         run: |
           $ErrorActionPreference = 'Stop'
           $fontcatchExe = (Resolve-Path 'src-tauri/target/x86_64-pc-windows-msvc/release/fontcatch.exe').Path
@@ -125,8 +127,31 @@ jobs:
           if (Test-Path $fontcatchDatabase) {
             throw 'Expected a fresh Fontcatch database on this disposable runner.'
           }
-          $fontcatchProcess = Start-Process -FilePath $fontcatchExe -ArgumentList '--autostart' -PassThru
+          $fontcatchStdout = Join-Path $env:RUNNER_TEMP 'fontcatch-startup.stdout.log'
+          $fontcatchStderr = Join-Path $env:RUNNER_TEMP 'fontcatch-startup.stderr.log'
+          $fontcatchStarted = Get-Date
+          $fontcatchClock = [Diagnostics.Stopwatch]::StartNew()
+          $fontcatchProcess = Start-Process -FilePath $fontcatchExe -ArgumentList '--autostart' -PassThru -RedirectStandardOutput $fontcatchStdout -RedirectStandardError $fontcatchStderr
           try {
+            # WebView2 initializes before SQLite. Allow a bounded cold start on
+            # hosted runners, while failing immediately if the process exits.
+            $fontcatchReady = $false
+            while ($fontcatchClock.Elapsed.TotalSeconds -lt 90) {
+              $fontcatchProcess.Refresh()
+              if ($fontcatchProcess.HasExited) {
+                throw "Fontcatch exited during startup (code $($fontcatchProcess.ExitCode))."
+              }
+              if ((Test-Path -Path $fontcatchDatabase -PathType Leaf) -and (Get-Item $fontcatchDatabase).Length -gt 0) {
+                $fontcatchReady = $true
+                break
+              }
+              Start-Sleep -Milliseconds 500
+            }
+            if (!$fontcatchReady) {
+              throw 'Fontcatch did not initialize its library database within 90 seconds.'
+            }
+            Write-Host "Fontcatch initialized its database after $([Math]::Round($fontcatchClock.Elapsed.TotalSeconds, 1)) seconds."
+            # Database creation alone is not success: retain the stability check.
             Start-Sleep -Seconds 10
             $fontcatchProcess.Refresh()
             if ($fontcatchProcess.HasExited) {
@@ -136,6 +161,23 @@ jobs:
               throw 'Fontcatch did not initialize its library database.'
             }
             Write-Host 'Fontcatch stayed running and initialized its library database.'
+          } catch {
+            foreach ($fontcatchLog in @($fontcatchStdout, $fontcatchStderr)) {
+              if (Test-Path $fontcatchLog) {
+                Write-Host $fontcatchLog
+                Get-Content $fontcatchLog -Tail 80
+              }
+            }
+            Get-Process -Name fontcatch,msedgewebview2 -ErrorAction SilentlyContinue | Select-Object Name,Id,StartTime | Format-Table
+            foreach ($fontcatchDataRoot in @([Environment]::GetFolderPath('ApplicationData'), [Environment]::GetFolderPath('LocalApplicationData'))) {
+              $fontcatchData = Join-Path $fontcatchDataRoot 'app.fontcatch.desktop'
+              Write-Host "Application data: $fontcatchData; exists: $(Test-Path $fontcatchData)"
+              if (Test-Path $fontcatchData) {
+                Get-ChildItem $fontcatchData | Select-Object -First 10 Name,Length | Format-Table
+              }
+            }
+            Get-WinEvent -FilterHashtable @{LogName='Application'; StartTime=$fontcatchStarted} -ErrorAction SilentlyContinue | Where-Object { $_.Message -match 'fontcatch|WebView2' } | Select-Object -First 5 TimeCreated,Id,Message | Format-List
+            throw
           } finally {
             $fontcatchProcess.Refresh()
             if (!$fontcatchProcess.HasExited) {
