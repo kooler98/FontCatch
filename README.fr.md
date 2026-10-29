@@ -14,7 +14,7 @@ Une petite app de bureau pour les designers qui préfèrent essayer une police p
 
 Tu trouves la bonne typo, tu la télécharges, puis les manipulations commencent. Décompresser le ZIP. Retrouver le dossier extrait. Ouvrir un sous-dossier. Trier les OTF, TTF, versions variables, polices web, README et documents de licence. Repérer la version voulue. L’installer. Recommencer pour la famille suivante.
 
-Fontcatch prend en charge les étapes d’installation pour te laisser comparer les typos et avancer sur ton design. L’app s’adresse aux designers de marque, graphistes, designers UI, directeurs artistiques et à toute personne qui essaie régulièrement de nouvelles polices.
+Fontcatch prend en charge les étapes d’installation pour te laisser comparer les typos et avancer sur ton design. L’app s’adresse aux designers de marque, graphistes, designers UI, directeurs artistiques et à toute personne qui essaie régulièrement de nouvelles polices. Les développeurs front-end et designers qui préparent les polices d’un site peuvent aussi convertir leurs fichiers locaux en WOFF2.
 
 ## Comment ça marche
 
@@ -34,6 +34,7 @@ Les ZIP pris en charge sont les archives ZIP32 classiques, sans compression ou a
 | **Installer depuis un ZIP** | Repérer et installer les polices de bureau sans extraire manuellement l’archive. Les ZIP sans rapport sont ignorés. |
 | **Choisir les bonnes versions** | Privilégier les polices variables, statiques ou les deux lorsqu’une famille propose plusieurs alternatives. Les doublons de noms PostScript sont vérifiés avant installation. |
 | **Essayer la vraie typo** | Afficher la police installée, changer de style, saisir ton texte et ajuster la taille. |
+| **Exporter une police web · sources 0.4.0** | Enregistrer le style sélectionné en WOFF2 ou convertir un TTF/OTF local sans l’installer. |
 | **Retrouver une police** | Chercher dans la bibliothèque Fontcatch par famille, fonderie ou source ; filtrer par type et par provenance lorsqu’elle est disponible. |
 | **Consulter les informations utiles** | Retrouver les styles, versions, sources et licences intégrées, ou afficher directement le fichier installé. |
 | **Retirer une famille** | Vérifier les fichiers concernés, puis déplacer les polices gérées vers la Corbeille. Une collection TTC partagée indique toutes les familles affectées. |
@@ -42,6 +43,15 @@ Les ZIP pris en charge sont les archives ZIP32 classiques, sans compression ou a
 **À propos des licences :** Fontcatch affiche les informations de licence intégrées au fichier de police. Il ne lit ni n’interprète les README, PDF ou documents de licence séparés présents dans le téléchargement. Si la police ne contient pas ces informations, l’app l’indique. Conserve la licence fournie par la fonderie : Fontcatch ne détermine pas les usages qu’elle autorise.
 
 La bibliothèque contient les polices installées avec Fontcatch. Elle ne recense pas toutes les polices déjà présentes sur ton ordinateur.
+
+### Exporter en WOFF2
+
+Disponible dans la **version 0.4.0 construite depuis les sources** ; la version de test Windows 0.3.5 publiée ne contient pas cette fonction.
+
+- **Depuis la bibliothèque :** sélectionne un style, puis **Exporter en WOFF2**. Pour une collection TTC, seule la face sélectionnée est exportée.
+- **Depuis un fichier :** choisis **Convertir un fichier…**, puis un `.ttf` ou `.otf`. La police est convertie sans être installée ni ajoutée à la bibliothèque.
+
+Choisis un nouveau nom et un emplacement dans la fenêtre d’enregistrement du système. La conversion reste locale, une police à la fois, avec une limite de 32 Mio en entrée. Les originaux restent inchangés et aucun fichier existant n’est écrasé. L’export conserve les métadonnées de licence intégrées ; vérifie que la licence autorise la conversion et l’utilisation sur le web. WOFF2 est ici un format d’export, pas un format à installer.
 
 ## Un fonctionnement local
 
@@ -59,7 +69,7 @@ Le [compte rendu de sécurité et de performance](docs/security-and-performance.
 
 ## Commencer
 
-**Version actuelle : 0.3.5 alpha.**
+**Sources actuelles : 0.4.0 alpha. Dernière version de test publiée : 0.3.5.**
 
 **[Télécharger Fontcatch pour Windows x64](https://github.com/kooler98/FontCatch/releases/download/v0.3.5/Fontcatch_0.3.5_x64-setup.exe)** · [Notes de version et empreintes SHA-256](https://github.com/kooler98/FontCatch/releases/tag/v0.3.5)
 
@@ -71,10 +81,12 @@ Laisse Fontcatch ouvert et télécharge une nouvelle police. Son icône dans la 
 
 L’installeur de test Windows n’est pas signé. Les builds macOS n’ont ni signature de distribution ni notarisation. Ton système peut afficher un avertissement ou bloquer leur ouverture.
 
-| Plateforme | Validation |
+Les validations sont indiquées par plateforme et par version. Le téléchargement Windows publié reste en 0.3.5 ; la validation Windows 0.4.0 est en attente.
+
+| Plateforme | Validation effectuée |
 | --- | --- |
-| macOS · Apple Silicon | Version 0.3.5 construite localement. Détection, installation, aperçus et désinstallation confirmée vérifiés sur la 0.3.4 ; le code macOS est inchangé. L’interface de la 0.3.5 n’a pas été retestée manuellement. |
-| Windows 10/11 · x64 visé | [Vérifications Windows réussies](https://github.com/kooler98/FontCatch/actions/runs/40540707057) : 84 tests Rust, installation et retrait natifs de polices, création de l’installeur NSIS et démarrage de l’app. La validation manuelle de l’interface reste à faire. |
+| macOS · Apple Silicon | Version 0.4.0 construite et testée localement : export WOFF2 d’un style installé et d’un fichier externe via les fenêtres natives, décodage indépendant, originaux conservés et annulation de l’enregistrement. La bibliothèque reste utilisable pendant l’attente d’accès initial au dossier. La détection de nouveaux téléchargements dans le vrai dossier surveillé reste non vérifiée en 0.4.0 ; les anciens tests d’installation, d’aperçu et de retrait concernent la 0.3.4. |
+| Windows 10/11 · x64 visé | Version 0.3.5 : [Vérifications Windows réussies](https://github.com/kooler98/FontCatch/actions/runs/40540707057) : 84 tests Rust, installation et retrait natifs de polices, création de l’installeur NSIS et démarrage de l’app. La validation manuelle de l’interface reste à faire. |
 | macOS · Intel | Pas encore testé ; aucune version Intel à télécharger. |
 | Linux | Expérimental. Fonctionnement natif non validé ; une alerte connue sur une dépendance GTK/glib doit être résolue avant distribution. |
 

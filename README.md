@@ -14,7 +14,7 @@ A small desktop app for designers who would rather try a typeface than dig throu
 
 You find the right typeface, download it, then the useful part stops. Unzip the archive. Find where it extracted. Open another folder. Sort through OTFs, TTFs, variable fonts, web fonts, README files and license documents. Find the version you wanted. Install it. Repeat for the next family.
 
-Fontcatch takes care of the installation steps so you can get back to comparing type and designing. It is made for brand and graphic designers, UI designers, art directors, and anyone who regularly tries new typefaces.
+Fontcatch takes care of the installation steps so you can get back to comparing type and designing. It is made for brand and graphic designers, UI designers, art directors, and anyone who regularly tries new typefaces. Front-end developers and designers preparing fonts for a website can also convert local files to WOFF2.
 
 ## How it works
 
@@ -34,6 +34,7 @@ ZIP support covers standard ZIP32 archives using Store or Deflate compression, w
 | **Install from a ZIP** | Find and install the desktop fonts without manually extracting the archive. Unrelated ZIPs are ignored. |
 | **Choose the versions you want** | Prefer variable fonts, static fonts, or both when a family offers alternatives. Duplicate PostScript names are checked before installation. |
 | **Try the actual typeface** | Preview the installed font, change styles, type your own text and adjust the size. |
+| **Export a web font · 0.4.0 source** | Save the selected library style as WOFF2, or convert a local TTF/OTF without installing it. |
 | **Find a font again** | Search the Fontcatch library by family, foundry or source; filter by type and download source when available. |
 | **Keep useful details nearby** | Inspect styles, version information, source details and embedded license text or links. Reveal the installed file when you need it. |
 | **Remove a family** | Review the files affected, then move the managed font files to Trash. Shared TTC collections list all affected families. |
@@ -42,6 +43,15 @@ ZIP support covers standard ZIP32 archives using Store or Deflate compression, w
 **About licenses:** Fontcatch displays license information embedded in the font file. It does not read or interpret separate README files, PDFs or license documents inside a download. If the font does not include that metadata, the app says so. Keep the license supplied by the foundry; Fontcatch does not determine which uses it permits.
 
 The library contains fonts installed through Fontcatch. It is not a catalog of every font already on your computer.
+
+### Export WOFF2
+
+Available in the **0.4.0 source build**; the published 0.3.5 Windows preview does not include this feature.
+
+- **From the library:** select a style, then choose **Export WOFF2**. For a TTC collection, only the selected face is exported.
+- **From a file:** choose **Convert file…** and select a `.ttf` or `.otf`. The font is converted without being installed or added to the library.
+
+Choose a new filename and destination in the system's Save dialog. Conversion happens locally, one font at a time, with a 32 MiB input limit. Original files stay unchanged, and existing destination files are never overwritten. The export retains embedded license metadata; check that the font's license allows conversion and web use. WOFF2 is an export format here, not an installation input.
 
 ## Local by design
 
@@ -59,7 +69,7 @@ See the [security and performance review](docs/security-and-performance.md) for 
 
 ## Get started
 
-**Current version: 0.3.5 alpha.**
+**Current source: 0.4.0 alpha. Latest published preview: 0.3.5.**
 
 **[Download Fontcatch for Windows x64](https://github.com/kooler98/FontCatch/releases/download/v0.3.5/Fontcatch_0.3.5_x64-setup.exe)** · [Release notes and SHA-256 checksums](https://github.com/kooler98/FontCatch/releases/tag/v0.3.5)
 
@@ -71,10 +81,12 @@ Keep Fontcatch running and download a new font. Use its icon in the menu bar or 
 
 The Windows preview installer is unsigned. macOS builds do not have distribution signing or notarization. Your operating system may warn about or block these builds.
 
-| Platform | Validation |
+Validation is recorded per platform and version. The published Windows download remains 0.3.5; Windows 0.4.0 validation is pending.
+
+| Platform | Recorded validation |
 | --- | --- |
-| macOS · Apple Silicon | 0.3.5 built locally. Detection, installation, previews and confirmed uninstallation were verified on 0.3.4; macOS code is unchanged. The 0.3.5 interface has not been retested manually. |
-| Windows 10/11 · x64 target | [Windows CI passed](https://github.com/kooler98/FontCatch/actions/runs/40540707057): 84 Rust tests, native font installation/removal, NSIS packaging and app startup checks. Manual desktop validation is still pending. |
+| macOS · Apple Silicon | 0.4.0 built and tested locally: library-style and external-file WOFF2 export through native dialogs, independently decoded outputs, unchanged originals and Save cancellation. The library stays usable while initial folder access is pending. New-download detection in the real watched folder remains unverified on 0.4.0; earlier installation/preview/removal checks apply to 0.3.4. |
+| Windows 10/11 · x64 target | 0.3.5: [Windows CI passed](https://github.com/kooler98/FontCatch/actions/runs/40540707057): 84 Rust tests, native font installation/removal, NSIS packaging and app startup checks. Manual desktop validation is still pending. |
 | macOS · Intel | Not yet tested; no Intel preview build. |
 | Linux | Experimental. Native behavior is unvalidated and a known GTK/glib dependency warning must be resolved before distribution. |
 

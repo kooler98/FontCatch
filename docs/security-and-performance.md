@@ -1,8 +1,31 @@
-# Security and performance review — 0.3.5 Windows preview
+# Security and performance review
 
-Reviewed on 27 October 2026 using local macOS checks and Windows CI. This is a development review, not an independent security audit or a guarantee of safety for arbitrary fonts.
+This is a development review, not an independent security audit or a guarantee of safety for arbitrary fonts.
 
-## Changes
+## 0.4.0 — WOFF2 export and responsive startup, 29 October 2026
+
+WOFF2 conversion runs locally in Rust, with a 32 MiB input limit and one conversion worker. Validate table counts, bounds, unique tags and non-overlapping ranges before compression. Conversion preserves font tables apart from the required signature removal and header normalization; it does not sanitize arbitrary glyph programs. External sources and destinations come from native dialogs, not arbitrary IPC paths. Save a new `.woff2` atomically without replacing an existing file, and retain the original font. Library collections are exported one selected face at a time.
+
+Verified on the local macOS build:
+
+- **94 Rust tests passed**; 3 opt-in tests remained ignored: two QA helpers and the macOS installation smoke test. Formatting and Clippy for all local targets passed with warnings treated as errors.
+- **8 TypeScript tests and 18 browser interaction tests passed**, along with the production frontend build.
+- Independent FontTools decoding and Chrome `FontFace` loading succeeded for four generated outputs: static TrueType, variable TrueType, CFF OpenType and a selected TTC face.
+- Audits on 29 October reported zero npm vulnerabilities and zero entries in Cargo's vulnerability list. The same five RustSec warnings listed below remain unresolved.
+
+The final regular application bundle contains **17,889,093 bytes (17.06 MiB)**. Its ZIP contains **4,990,684 bytes** and passed archive CRC verification. A 32 MiB incompressible stress input took **2.25 seconds in a debug build**, with **210.6 MiB peak process RSS** during conversion. This temporary peak is a measured test result, not idle memory use or a guaranteed memory ceiling for every font.
+
+Native QA on the final regular 0.4.0 Apple Silicon app verified both WOFF2 paths: a selected external CFF OTF passed through native Open and Save dialogs to a 552-byte output, and a selected installed library style produced a 15,236-byte output. FontTools independently decoded both outputs; the external source hash was unchanged. Cancelling Save produced no error and unlocked the controls.
+
+Startup now creates the library and command worker independently of the initial watched-folder scan. Native QA confirmed that the library remains usable and WOFF2 export works while that initial filesystem read is blocked. The selected Downloads folder read was still pending on this Mac, and macOS displayed a folder-access permission prompt. Approval and resumed detection have not yet been verified. New-download detection in that real folder was therefore **not validated on 0.4.0**. Live filesystem-event tests passed in temporary folders. Later fallback scans and folder reconfiguration can still wait on filesystem access; this change isolates the initial scan rather than removing every possible filesystem wait.
+
+No Windows CI run has yet validated 0.4.0; the passing Windows results below apply to 0.3.5.
+
+## Historical review — 0.3.5 Windows preview, 27 October 2026
+
+Reviewed using local macOS checks and Windows CI.
+
+### Changes
 
 - Removed decorative captions, empty-state ornaments and unconfigured external-link buttons. The footer contains only the creator credit. Loading uses a CSS spinner without a React timer.
 - Display recent history in batches of 50. Collapsed rows do not mount their details; SQLite selects at most 500 recent jobs plus all pending jobs. Old jobs remain in the database. Installed fonts retain their license metadata; completed history no longer duplicates it.
@@ -18,7 +41,7 @@ Reviewed on 27 October 2026 using local macOS checks and Windows CI. This is a d
 - Preserve Windows paths as UTF-16 rather than converting them through lossy UTF-8. Reject embedded NULs, paths outside the configured font directory, and filenames that do not match Fontcatch's generated format. Track registrations within the process to avoid repeated resource additions; bound native unregistration attempts. Files that remain locked are handled by the existing uninstall error and rollback path.
 - Deliver Windows font-change notifications asynchronously. Embed a Common-Controls v6 manifest in both the application and Rust test executables; this addresses the upstream [Tauri test-loader issue](https://github.com/tauri-apps/tauri/issues/13419). The manifest requests `asInvoker` with `uiAccess=false`, without requesting elevation.
 
-## Dependency audit
+### Dependency audit
 
 `npm audit`: zero reported vulnerabilities. `cargo audit`: zero entries in the vulnerability list after the ZIP upgrade, using the RustSec database fetched on 27 October 2026.
 
@@ -34,7 +57,7 @@ Remaining RustSec **warnings are not hidden or ignored**:
 
 These packages are absent from the `aarch64-apple-darwin` dependency tree. The lockfile includes dependencies for all supported platforms. A successful `cargo audit` exit alone does not mean that every warning is resolved.
 
-## Previous macOS verification — 0.3.4
+### Previous macOS verification — 0.3.4
 
 - 83 Rust tests: archive traversal and expansion limits, raw ZIP metadata limits and stable snapshots, malformed fonts, symlinks, duplicate/update handling, recovery after interrupted operations, guarded uninstall, URL migration, bounded history and live macOS filesystem events.
 - 8 TypeScript tests and 8 browser interaction tests, including real FontFace loading from synthetic fixtures, per-style previews, license text rendering, confirmation/cancellation, stale uninstall plans and a 130-entry history.
@@ -44,7 +67,7 @@ These packages are absent from the `aarch64-apple-darwin` dependency tree. The l
 
 The 0.3.4 Apple Silicon build contains 16,594,347 bytes (15.83 MiB); its verified ZIP is 4,466,764 bytes, compared with 5,217,712 bytes for 0.3.0. This is a package-size measurement, not a claim of equivalent RAM savings. Full fallback directory scans are 15 times less frequent at idle; event-driven detection is retained.
 
-## Verification — 0.3.5
+### Verification — 0.3.5
 
 The frontend build, 3 native-launcher tests, 8 TypeScript tests, 8 browser interaction tests, and `npm audit` passed for 0.3.5.
 

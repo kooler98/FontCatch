@@ -30,7 +30,7 @@ Windows CI runs on Windows Server 2022 x64 with an administrator account. Succes
 
 The front end is React, TypeScript, Vite, and Tailwind. UI tokens live in `src/styles/tokens.css`; translations are simple FR/EN JSON files. Beautiful UI components are copied and adapted, with their license kept alongside the source.
 
-The Rust pipeline is split into `watcher`, `extractor`, `inspector`, `installer`, `library`, `preview`, and `engine`. Platform installers share a common trait. Font data uses SQLite; preferences use a separate Tauri Store file.
+The Rust pipeline is split into `watcher`, `extractor`, `inspector`, `installer`, `library`, `preview`, and `engine`. WOFF2 conversion and native file dialogs live in `woff2` and `export`. Platform installers share a common trait. Font data uses SQLite; preferences use a separate Tauri Store file.
 
 Maintain these behaviors:
 
@@ -41,7 +41,23 @@ Maintain these behaviors:
 - Move user files to Trash instead of permanently deleting them; refuse files that changed after installation.
 - Preview the actual managed file. Keep missing or unreadable preview errors visible.
 - Do not process pre-existing downloads on startup. Resume already recorded pending requests in Auto mode.
+- Export only the selected library style; extract a selected TTC face before encoding. External conversion accepts TTF/OTF and must not install the input.
+- Keep conversion local, off the UI thread, and limited to one active request. Preserve originals and refuse existing export destinations.
+- Retain embedded license metadata. Conversion does not grant font redistribution or web-use rights.
 - Keep French and English copy consistent.
+
+## WOFF2 conversion
+
+The 0.4.0 source uses `ttf2woff2` 0.14.1 without CLI features, with Brotli quality 8 and a single compression worker. It does not invoke an external converter. Input is limited to 32 MiB and validated before encoding. Null table transforms retain outlines, variation data and embedded license metadata; the private copy drops DSIG and updates `head.flags` and checksums as required by WOFF2.
+
+The ordinary Rust suite covers static TTF, variable TTF, CFF OTF and selected TTC faces with an independent decoder, plus malformed input, size limits, preservation of originals and refusal to overwrite files. Run the focused checks with:
+
+```sh
+npm run test:rust -- woff2::tests
+npm run test:rust -- export::tests
+```
+
+For native UI changes, test both library export and external-file conversion, cancel each dialog, try an existing destination, and open the output in a browser. Check that the selected style is exported and that the original and library remain unchanged. Use the project's synthetic fixtures for these checks.
 
 ## Test fixtures and real installation
 
